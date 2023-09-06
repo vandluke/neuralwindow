@@ -105,6 +105,7 @@ static nw_error_t *map_set_entry(entry_t *entries, uint64_t capacity, string_t k
         if (strcmp(key, entries[index].key) == 0)
         {
             entries[index].data = data;
+            return NULL;
         }
         ++index;
         if (index >= capacity)
