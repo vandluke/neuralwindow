@@ -18,6 +18,19 @@ extern "C" {
 #define SYNCHRONOUS 1
 #endif
 
+static inline float __attribute__((unused)) get_occupancy(const void * func, int blk_sz) {
+    cudaDeviceSynchronize();
+    int max_active_blocks;
+    int device;
+    cudaDeviceProp props;
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor( &max_active_blocks, func, blk_sz, 0);
+    cudaGetDevice(&device);
+    cudaGetDeviceProperties(&props, device);
+    return (max_active_blocks * blk_sz / props.warpSize) / 
+                    (float)(props.maxThreadsPerMultiProcessor / 
+                            props.warpSize);
+}
+
 #define EPSILON 1e-7
 
 #define NW_WARP_SIZE 32
