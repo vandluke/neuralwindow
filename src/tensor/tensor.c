@@ -61,6 +61,10 @@ void tensor_destroy(tensor_t *tensor)
         tensor_destroy(tensor->gradient);
         function_destroy(tensor->context);
         free(tensor);
+
+        #ifdef GRAPH
+            destroy_graph();
+        #endif
     }
 }
 

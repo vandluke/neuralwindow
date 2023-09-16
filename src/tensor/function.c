@@ -362,6 +362,36 @@ nw_error_t *function_forward(function_t *function, tensor_t **result)
     {
         return ERROR(ERROR_NULL, string_create("result is null."), NULL);
     }
+    
+    #ifdef GRAPH
+        switch(operation_type)
+        {
+            case UNARY_OPERATION:
+                graph_unary_operation(operation->unary_operation->x,
+                                      *result,
+                                      operation_type_string(operation_type_t operation_type));
+                break;
+            case BINARY_OPERATION:
+                graph_binary_operation(operation->binary_operation->x, 
+                                       operation->binary_operation->y,
+                                       *result,
+                                       operation_type_string(operation_type_t operation_type));
+                break;
+            case REDUCTION_OPERATION:
+                graph_unary_operation(operation->reduction_operation->x,
+                                      *result,
+                                      operation_type_string(operation_type_t operation_type));
+                break;
+            case STRUCTURE_OPERATION:
+                graph_unary_operation(operation->structure_operation->x,
+                                      *result,
+                                      operation_type_string(operation_type_t operation_type));
+                break;
+            default:
+                error = ERROR(ERROR_UKNOWN_OPERATION_TYPE, string_create("unknown operation type %d.", (int) operation_type), NULL);
+                break;
+        }
+    #endif
 
     return error;
 }
