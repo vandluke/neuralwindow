@@ -1066,10 +1066,6 @@ extern "C" void cu_compare_equal(datatype_t datatype, int64_t n, const void *x_d
 }
 
 __global__ static void cu_compare_greater_float32(int n, const float32_t *x_data, int x_stride, const float32_t *y_data, int y_stride, float32_t *z_data, int z_stride)
-=======
-// TODO: Leaving this part for Mohammed.
-extern "C" static void cu_compare_greater_float32(int n, const float32_t *x_data, int x_stride, const float32_t *y_data, int y_stride, float32_t *z_data, int z_stride)
->>>>>>> 7d17052 (Bug fix for debug mode; all but one of the remaining kerrnels.)
 {
     int i = (blockDim.x * blockIdx.x) + threadIdx.x;
     if (i < n)
@@ -1247,7 +1243,6 @@ extern "C" void cu_summation(datatype_t datatype, int64_t n, const void *x_data,
     }
 }
 
-<<<<<<< HEAD
 // Since atomicMAX doesn't normally support float
 __device__ static float32_t atomicMAX(float32_t *address, float32_t val)
 {
