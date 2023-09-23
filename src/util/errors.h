@@ -353,6 +353,7 @@ typedef enum nw_error_type_t
     ERROR_MEMORY_FREE,
     ERROR_UNKNOWN_RUNTIME,
     ERROR_UKNOWN_OPERATION_TYPE,
+    ERROR_UKNOWN_LAYER_TYPE,
     ERROR_NULL,
     ERROR_DATATYPE_CONFLICT,
     ERROR_SHAPE_CONFLICT,
@@ -403,6 +404,7 @@ typedef enum nw_error_type_t
     ERROR_SIGMOID,
     ERROR_PUSH,
     ERROR_GRAPH,
+    ERROR_DROPOUT,
 } nw_error_type_t;
 
 typedef struct nw_error_t
