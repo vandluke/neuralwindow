@@ -8,6 +8,7 @@ endif()
 
 set(TEST_DIR test)
 set(SRC_DIR src)
+set(EXAMPLE_DIR example)
 set(REPORT_DIR lcov)
 
 set(BUILD_SHARED_LIBS OFF)
@@ -47,6 +48,7 @@ endif()
 list(APPEND CMAKE_CTEST_ARGUMENTS "--output-on-failure")
 
 add_subdirectory(${SRC_DIR})
+add_subdirectory(${EXAMPLE_DIR})
 enable_testing()
 add_subdirectory(${TEST_DIR})
 
@@ -67,8 +69,8 @@ add_custom_target(report
 )
 
 add_custom_command(TARGET report POST_BUILD
-    COMMAND ${LCOV} --directory .. --capture --output-file lcov.info
-    COMMAND ${LCOV} --remove lcov.info -o lcov.info "${PROJECT_SOURCE_DIR}/${TEST_DIR}/*"
+    COMMAND ${LCOV} --directory ../src/ --capture --output-file lcov.info
+    COMMAND ${LCOV} --remove lcov.info -o lcov.info "/usr/include/x86_64-linux-gnu/bits/*" "${PROJECT_SOURCE_DIR}/${TEST_DIR}/*"
     COMMAND ${GENHTML} -o . lcov.info
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/${REPORT_DIR}
 )
