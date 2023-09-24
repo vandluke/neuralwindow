@@ -33,8 +33,8 @@ nw_error_t *create_graph_node(graph_node_t **graph_node, uint64_t tensor_id, uin
 nw_error_t *update_graph_id(uint64_t tensor_id, uint64_t new_graph_id);
 string_t get_attribute_format(uint64_t rank, uint64_t *attr);
 nw_error_t *graph_tensor_node(tensor_t *tensor);
-nw_error_t *graph_operation_node(string_t op, uint64_t *graph_node_id);
-nw_error_t *graph_edge(uint64_t node_1, uint64_t node_2);
+uint64_t graph_operation_node(string_t op);
+nw_error_t *graph_edge(uint64_t node_1_ID, uint64_t node_2_ID);
 nw_error_t *graph_binary_operation(tensor_t *x, tensor_t *y, tensor_t *z, string_t operation);
 
 #endif

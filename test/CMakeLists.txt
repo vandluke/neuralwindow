@@ -26,6 +26,11 @@ set(TEST_HELPER
     test_helper
 )
 
+set(
+    GRAPH_LIBRARIES
+    cgraph
+)
+
 set(TESTS ${TEST_C} ${TEST_CXX})
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --nvlink-options=--disable-warnings")
 foreach(TEST ${TESTS})
@@ -40,6 +45,7 @@ foreach(TEST ${TESTS})
     target_include_directories(${TEST} PUBLIC ".")
     set_target_properties(${TEST} PROPERTIES PUBLIC_HEADER "${TEST_HELPER}.h")
     target_link_libraries(${TEST} ${PROJECT_NAME} check subunit m "${TORCH_LIBRARIES}")
+    target_link_libraries(${TEST} ${GRAPH_LIBRARIES})
     add_test(NAME ${TEST} COMMAND ${TEST} WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/${TEST_DIR})
     # add_custom_target("valgrind_${TEST}" COMMAND valgrind --leak-check=full  --show-reachable=yes --error-limit=no --gen-suppressions=all --log-file=../suppressions.log --suppressions=../../suppressions.supp $<TARGET_FILE:${TEST}> DEPENDS ${TEST})
     add_custom_target("valgrind_${TEST}" COMMAND valgrind --leak-check=full  --show-reachable=yes --error-limit=no --suppressions=../../suppressions.supp $<TARGET_FILE:${TEST}> DEPENDS ${TEST})

@@ -12,9 +12,13 @@ nw_error_t *initialize_graph()
         return ERROR(ERROR_MEMORY_ALLOCATION, "Graph file could not be created", NULL);
     }
 
+    agattr(graph, AGRAPH, "rankdir", "LR");
+    agattr(graph, AGNODE, "shape", "record");
+
     nw_error_t *error = stack_create(&stack);
     if (error != NULL) 
     {
+        agclose(graph);
         return ERROR(ERROR_MEMORY_ALLOCATION, "Stack could not be created", NULL);
     }
 
@@ -151,39 +155,29 @@ nw_error_t *graph_tensor_node(tensor_t *tensor)
     {
         return ERROR(ERROR_GRAPH, string_create("Could not add tensor node on the graph for tensor: %d", tensor->id), NULL); 
     }
-    agset(node, "label", (char *)node_label);
+    agsafeset(node, "label", (char *)node_label, "");
 
     // update stack
     nw_error_t *error = update_graph_id(tensor->id, new_node_it);
     return error;
 }
 
-nw_error_t *graph_operation_node(string_t op, uint64_t *graph_node_id)
-{
-    if (graph == NULL || stack == NULL)
-    {
-        nw_error_t *error = initialize_graph();
-        if (error != NULL)
-        {
-            return error;
-        }
-    }
-    
+uint64_t graph_operation_node(string_t op)
+{   
     // update graph                                                                        
     Agnode_t *node = agnode(graph, (char *)string_create("%d", ++node_id), 1);
-    if (node == NULL) 
-    {
-        return ERROR(ERROR_GRAPH, string_create("Could not add operation node on the graph for operation: %s", op), NULL); 
-    }
-    agset(node, "shape", "oval");
-    agset(node, "label", (char *)op);
-    graph_node_id = &node_id;
-    return NULL;
+    agsafeset(node, "shape", "oval", "");
+    agsafeset(node, "label", (char *)op, "");
+    return node_id;
 }
 
-nw_error_t *graph_edge(uint64_t node_1, uint64_t node_2)
+nw_error_t *graph_edge(uint64_t node_1_ID, uint64_t node_2_ID)
 {
-    Agedge_t *edge = agedge(graph, (Agnode_t *)node_1, (Agnode_t *)node_2, "f0", 1);
+    Agnode_t *node1, *node2;
+    node1 = agnode(graph, (char *)string_create("%d", node_1_ID), 0);
+    node2 = agnode(graph, (char *)string_create("%d", node_2_ID), 0);
+
+    Agedge_t *edge = agedge(graph, node1, node2, NULL, 1);
     if (edge == NULL) 
     {
         return ERROR(ERROR_GRAPH, "Could not add edge on the graph", NULL); 
@@ -194,7 +188,7 @@ nw_error_t *graph_edge(uint64_t node_1, uint64_t node_2)
 
 nw_error_t *graph_binary_operation(tensor_t *x, tensor_t *y, tensor_t *z, string_t operation)
 {
-    uint64_t x_id, y_id, z_id, op_id, *ptr_op_id;
+    uint64_t x_id, y_id, z_id, op_id;
     nw_error_t *error;
 
     // add nodes
@@ -219,12 +213,7 @@ nw_error_t *graph_binary_operation(tensor_t *x, tensor_t *y, tensor_t *z, string
         return error;
     }
 
-    error = graph_operation_node(operation, ptr_op_id);
-    op_id = *ptr_op_id;
-    if (error != NULL)
-    {
-        return error;
-    }
+    op_id = graph_operation_node(operation);
 
     // add edges
     error = graph_edge(x_id, op_id);
@@ -250,7 +239,7 @@ nw_error_t *graph_binary_operation(tensor_t *x, tensor_t *y, tensor_t *z, string
 
 nw_error_t *graph_unary_operation(tensor_t *x, tensor_t *y, string_t operation)
 {
-    uint64_t x_id, y_id, op_id, *ptr_op_id;
+    uint64_t x_id, y_id, op_id;
     nw_error_t *error;
 
     // add nodes
@@ -268,12 +257,7 @@ nw_error_t *graph_unary_operation(tensor_t *x, tensor_t *y, string_t operation)
         return error;
     }
 
-    error = graph_operation_node(operation, ptr_op_id);
-    op_id = *ptr_op_id;
-    if (error != NULL)
-    {
-        return error;
-    }
+    op_id = graph_operation_node(operation);
 
     // add edges
     error = graph_edge(x_id, op_id);

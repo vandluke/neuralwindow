@@ -10,6 +10,7 @@
 #include <buffer.h>
 #include <view.h>
 #include <string.h>
+#include <graph.h>
 
 /**
  * @brief Dynamically memory allocate and initialize a tensor.

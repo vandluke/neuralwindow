@@ -8,6 +8,7 @@
 #include <view.h>
 #include <buffer.h>
 #include <string.h>
+#include <graph.h>
 
 /**
  * @brief The function constructor.
