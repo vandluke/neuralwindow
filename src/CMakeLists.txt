@@ -80,6 +80,7 @@ set(
 set(
     GPU_LIBRARIES
     cublas
+    cusparse
     "${MAGMA_DIR}/lib/libmagma.so"
 )
 
