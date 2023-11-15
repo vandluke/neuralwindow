@@ -18,18 +18,6 @@ extern "C" {
 #define SYNCHRONOUS 1
 #endif
 
-static inline float __attribute__((unused)) get_occupancy(const void * func, int blk_sz) {
-    int max_active_blocks;
-    int device;
-    cudaDeviceProp props;
-    cudaOccupancyMaxActiveBlocksPerMultiprocessor( &max_active_blocks, func, blk_sz, 0);
-    cudaGetDevice(&device);
-    cudaGetDeviceProperties(&props, device);
-    return (max_active_blocks * blk_sz / props.warpSize) / 
-                    (float)(props.maxThreadsPerMultiProcessor / 
-                            props.warpSize);
-}
-
 #define EPSILON 1e-7
 
 #define NW_WARP_SIZE 32
@@ -96,29 +84,18 @@ extern "C" nw_error_t *cu_memory_allocate(void **pp, size_t size)
 {
     CHECK_NULL_ARGUMENT(pp, "pp");
 
-#if USE_MAGMA
-    magma_int_t error = magma_malloc(pp, size);
-    if (error != MAGMA_SUCCESS) {
-        return ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes %s.", size, magma_strerror(error)), NULL);
-    }
-#else
     cudaError_t error = cudaMallocManaged(pp, size);
     if (error != cudaSuccess)
     {
         return ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes %s.", size, cudaGetErrorString(error)), NULL);
     }
-#endif
 
     return NULL;
 }
 
 extern "C" void cu_memory_free(void *p)
 {
-#if USE_MAGMA
-    magma_free(p);
-#else
     cudaFree(p);
-#endif
 }
 
 __global__ static void cu_exponential_float32(int n, const float32_t *x_data, int x_stride, float32_t *y_data, int y_stride)
@@ -1224,7 +1201,6 @@ extern "C" static void cu_summation_float32(int n, const float32_t *x_data, int 
     *y_data = magma_sdot(n, (magmaFloat_const_ptr) x_data, x_stride, (magmaFloat_const_ptr) temp, 0, m_queue);
     magma_queue_sync(m_queue);
     cudaFree(temp);
-#endif
 }
 
 extern "C" static void cu_summation_float64(int n, const float64_t *x_data, int x_stride, float64_t *y_data)
@@ -1238,7 +1214,6 @@ extern "C" static void cu_summation_float64(int n, const float64_t *x_data, int 
     *y_data = magma_ddot(n, (magmaDouble_const_ptr) x_data, x_stride, (magmaDouble_const_ptr) temp, 0, m_queue);
     magma_queue_sync(m_queue);
     cudaFree(temp);
-#endif
 }
 
 extern "C" void cu_summation(datatype_t datatype, int64_t n, const void *x_data, int64_t x_stride, int64_t x_offset, void *y_data, int64_t y_offset)
