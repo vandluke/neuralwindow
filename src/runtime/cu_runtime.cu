@@ -14,6 +14,8 @@ extern "C" {
 }
 #include <magma_v2.h>
 
+#include <iostream>
+
 #ifndef SYNCHRONOUS
 #define SYNCHRONOUS 1
 #endif
@@ -151,6 +153,7 @@ extern "C" void cu_exponential(datatype_t datatype, int64_t n, const void *x_dat
     // presumably because we know we're not going to overflow.
     int block_size;
     int grid_size;
+    cudaError_t error;
 
     switch (datatype)
     {
@@ -204,12 +207,16 @@ extern "C" void cu_logarithm(datatype_t datatype, int64_t n, const void *x_data,
     int block_size;
     int min_grid_size;
     int grid_size;
+    cudaError_t error; 
 
     switch (datatype)
     {
     case FLOAT32:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_logarithm_float32, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
@@ -221,7 +228,7 @@ extern "C" void cu_logarithm(datatype_t datatype, int64_t n, const void *x_data,
         break;
 
     case FLOAT64:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_logarithm_float64, 0, 0);
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
@@ -260,12 +267,16 @@ extern "C" void cu_sine(datatype_t datatype, int64_t n, const void *x_data, int6
     int block_size;
     int min_grid_size;
     int grid_size;
+    cudaError_t error;
 
     switch (datatype)
     {
     case FLOAT32:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_sine_float32, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
@@ -276,7 +287,7 @@ extern "C" void cu_sine(datatype_t datatype, int64_t n, const void *x_data, int6
 #endif
         break;
     case FLOAT64:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_sine_float64, 0, 0);
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
@@ -315,12 +326,16 @@ extern "C" void cu_cosine(datatype_t datatype, int64_t n, const void *x_data, in
     int block_size;
     int min_grid_size;
     int grid_size;
+    cudaError_t error;
 
     switch (datatype)
     {
     case FLOAT32:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_cosine_float32, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
@@ -331,7 +346,7 @@ extern "C" void cu_cosine(datatype_t datatype, int64_t n, const void *x_data, in
 #endif
         break;
     case FLOAT64:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_cosine_float64, 0, 0);
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
@@ -370,12 +385,16 @@ extern "C" void cu_square_root(datatype_t datatype, int64_t n, const void *x_dat
     int block_size;
     int min_grid_size;
     int grid_size;
+    cudaError_t error;
 
     switch (datatype)
     {
     case FLOAT32:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_square_root_float32, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
@@ -386,7 +405,7 @@ extern "C" void cu_square_root(datatype_t datatype, int64_t n, const void *x_dat
 #endif
         break;
     case FLOAT64:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_square_root_float64, 0, 0);
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
@@ -425,12 +444,16 @@ extern "C" void cu_reciprocal(datatype_t datatype, int64_t n, const void *x_data
     int block_size;
     int min_grid_size;
     int grid_size;
+    cudaError_t error;
 
     switch (datatype)
     {
     case FLOAT32:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_reciprocal_float32, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
@@ -441,7 +464,7 @@ extern "C" void cu_reciprocal(datatype_t datatype, int64_t n, const void *x_data
 #endif
         break;
     case FLOAT64:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_reciprocal_float64, 0, 0);
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
@@ -516,12 +539,16 @@ void cu_negation(datatype_t datatype,
     int block_size;
     int min_grid_size;
     int grid_size;
+    cudaError_t error;
 
     switch (datatype)
     {
     case FLOAT32:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_negation_float32, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
@@ -532,7 +559,7 @@ void cu_negation(datatype_t datatype,
 #endif
         break;
     case FLOAT64:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_negation_float64, 0, 0);
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
@@ -573,12 +600,16 @@ extern "C" void cu_rectified_linear(datatype_t datatype, int64_t n, const void *
     int block_size;
     int min_grid_size;
     int grid_size;
+    cudaError_t error;
 
     switch (datatype)
     {
     case FLOAT32:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_rectified_linear_float32, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
@@ -589,7 +620,7 @@ extern "C" void cu_rectified_linear(datatype_t datatype, int64_t n, const void *
 #endif
         break;
     case FLOAT64:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_rectified_linear_float64, 0, 0);
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
@@ -630,12 +661,16 @@ extern "C" void cu_sigmoid(datatype_t datatype, int64_t n, const void *x_data, i
     int block_size;
     int min_grid_size;
     int grid_size;
+    cudaError_t error;
 
     switch (datatype)
     {
     case FLOAT32:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_sigmoid_float32, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
@@ -646,7 +681,7 @@ extern "C" void cu_sigmoid(datatype_t datatype, int64_t n, const void *x_data, i
 #endif
         break;
     case FLOAT64:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_sigmoid_float64, 0, 0);
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
@@ -841,12 +876,16 @@ extern "C" void cu_multiplication(datatype_t datatype,
     int block_size;
     int min_grid_size;
     int grid_size;
+    cudaError_t error;
 
     switch (datatype)
     {
     case FLOAT32:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_multiplication_float32, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
@@ -863,7 +902,7 @@ extern "C" void cu_multiplication(datatype_t datatype,
 #endif
         break;
     case FLOAT64:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_multiplication_float64, 0, 0);
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
@@ -908,12 +947,16 @@ extern "C" void cu_division(datatype_t datatype, int64_t n, const void *x_data, 
     int block_size;
     int min_grid_size;
     int grid_size;
+    cudaError_t error;
 
     switch (datatype)
     {
     case FLOAT32:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_division_float32, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
@@ -924,7 +967,7 @@ extern "C" void cu_division(datatype_t datatype, int64_t n, const void *x_data, 
 #endif
         break;
     case FLOAT64:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_division_float64, 0, 0);
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
@@ -963,12 +1006,16 @@ extern "C" void cu_power(datatype_t datatype, int64_t n, const void *x_data, int
     int block_size;
     int min_grid_size;
     int grid_size;
+    cudaError_t error;
 
     switch (datatype)
     {
     case FLOAT32:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_power_float32, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
@@ -979,7 +1026,7 @@ extern "C" void cu_power(datatype_t datatype, int64_t n, const void *x_data, int
 #endif
         break;
     case FLOAT64:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_power_float64, 0, 0);
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
@@ -1024,12 +1071,16 @@ extern "C" void cu_compare_equal(datatype_t datatype, int64_t n, const void *x_d
     int block_size;
     int min_grid_size;
     int grid_size;
+    cudaError_t error;
 
     switch (datatype)
     {
     case FLOAT32:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_compare_equal_float32, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
@@ -1040,7 +1091,7 @@ extern "C" void cu_compare_equal(datatype_t datatype, int64_t n, const void *x_d
 #endif
         break;
     case FLOAT64:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_compare_equal_float64, 0, 0);
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
@@ -1079,12 +1130,16 @@ extern "C" void cu_compare_greater(datatype_t datatype, int64_t n, const void *x
     int block_size;
     int min_grid_size;
     int grid_size;
+    cudaError_t error;
 
     switch (datatype)
     {
     case FLOAT32:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_compare_greater_float32, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
@@ -1095,7 +1150,7 @@ extern "C" void cu_compare_greater(datatype_t datatype, int64_t n, const void *x
 #endif
         break;
     case FLOAT64:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_compare_greater_float64, 0, 0);
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
@@ -1294,12 +1349,16 @@ extern "C" void cu_maximum(datatype_t datatype, uint64_t n, const void *x_data, 
     int block_size;
     int min_grid_size;
     int grid_size;
+    cudaError_t error;
 
     switch (datatype)
     {
     case FLOAT32:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_maximum_float32, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
@@ -1310,7 +1369,7 @@ extern "C" void cu_maximum(datatype_t datatype, uint64_t n, const void *x_data, 
 #endif
         break;
     case FLOAT64:
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
+        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_maximum_float64, 0, 0);
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
