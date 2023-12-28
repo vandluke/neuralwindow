@@ -1275,7 +1275,7 @@ __global__ static void cu_maximum_float32(int n, const float32_t *x_data, int x_
     *y_data = current_maximum;
 }
 
-__global__ static void cu_maximum_float64_device(int n, const float64_t *x_data, int x_stride, float64_t *y_data)
+__global__ static void cu_maximum_float64(int n, const float64_t *x_data, int x_stride, float64_t *y_data)
 {
     __shared__ float64_t current_maximum;
     current_maximum = *x_data;
@@ -1329,6 +1329,10 @@ static void cu_maximum_float64(int n, const float64_t *x_data, int x_stride, flo
 
 extern "C" void cu_maximum(datatype_t datatype, uint64_t n, const void *x_data, uint64_t x_stride, uint64_t x_offset, void *y_data, uint64_t y_offset)
 {
+    int block_size;
+    int min_grid_size;
+    int grid_size;
+
     switch (datatype)
     {
     case FLOAT32:
@@ -1349,6 +1353,9 @@ extern "C" void cu_maximum(datatype_t datatype, uint64_t n, const void *x_data, 
     case FLOAT64:
         error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
                 cu_maximum_float64, 0, 0);
+        if (error != cudaSuccess) {
+            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
+        }
 
         grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
 
