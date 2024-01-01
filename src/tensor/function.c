@@ -3443,3 +3443,13 @@ nw_error_t *apply_backward(tensor_t *result)
 
     return error;
 }
+
+/**Reconstruct tensor deque with optimized fused operations.
+ * @param tensors The deque of tensors.
+ */
+nw_error_t *function_optimize(deque_t *tensors)
+{
+    UNUSED(tensors);
+
+    return NULL;
+}

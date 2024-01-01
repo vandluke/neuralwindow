@@ -629,6 +629,7 @@ typedef enum nw_error_type_t
     ERROR_TRANSPOSE,
     ERROR_SOFTMAX,
     ERROR_MEAN,
+    ERROR_OPTIMIZE,
     ERROR_FILE,
     ERROR_SETUP,
     ERROR_TEARDOWN,
