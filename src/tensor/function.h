@@ -10,6 +10,7 @@
 #include <operation.h>
 #include <errors.h>
 #include <buffer.h>
+#include <deque.h>
 
 typedef struct tensor_t tensor_t;
 
@@ -84,5 +85,6 @@ nw_error_t *apply_operation_creation(creation_operation_type_t creation_operatio
 nw_error_t *apply_forward(tensor_t **result);
 nw_error_t *apply_backward(tensor_t *result);
 nw_error_t *apply_synchronize(function_t *function);
+nw_error_t *function_schedule(deque_t *tensors);
 
 #endif

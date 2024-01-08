@@ -431,10 +431,11 @@ cleanup:
 
 /**
  * @brief Execute forward pass of a function.
- * @param function The function to execute.
- * @return Error if `function`, `function->operation`, `function->operation-><type>_operation`, 
+ * @param function[in] The function to execute.
+ * @param result[out] The output tensor.
+ * @return Error if `function`, `function->operation`, `function->operation-><type>_operation`,
  *         `function->operation-><type>_operation->result` is NULL.
- *         Error if operation type of `function` is unknown. 
+ *         Error if operation type of `function` is unknown.
  *         Error if operation failed to execute.
  *         NULL if function successfully executed.
  */
@@ -451,7 +452,7 @@ static nw_error_t *function_forward(function_t *function, tensor_t **result)
     error = operation_forward(operation, operation_type, result);
     if (error)
     {
-        return ERROR(ERROR_FORWARD, 
+        return ERROR(ERROR_FORWARD,
                      string_create("failed to execute operation forward pass of type %s.",
                      operation_type_string(function->operation_type)), error);
     }
@@ -488,15 +489,15 @@ nw_error_t *function_backward(function_t *function, tensor_t *gradient)
 /**
  * @brief Function level API for synchronization of operations on a tensor.
  * @param tensor[in] the tensor.
- * @return Error if `tensor` is NULL.
- *         Error if `tensor->storage` is NULL.
+ * @return Error if `tensor`, `tensor->buffer`, or `tensor->storage` is NULL.
  *         NULL if operation was successfully created.
  */
 nw_error_t *apply_synchronize(tensor_t *tensor) {
     CHECK_NULL_ARGUMENT(tensor, "tensor");
-    CHECK_NULL_ARGUMENT(tensor->storage, "tensor->storage");
+    CHECK_NULL_ARGUMENT(tensor->buffer, "tensor->buffer");
+    CHECK_NULL_ARGUMENT(tensor->buffer->storage, "tensor->buffer->storage");
 
-    runtime_synchronize(tensor->storage->runtime);
+    runtime_synchronize(tensor->buffer->storage->runtime);
 
     return NULL;
 }
@@ -4145,7 +4146,7 @@ nw_error_t *apply_backward(tensor_t *result)
  * @brief Reconstruct tensor deque with optimizations.
  * @param tensors The deque of tensors.
  */
-nw_error_t *function_optimize(deque_t *tensors)
+nw_error_t *function_schedule(deque_t *tensors)
 {
     UNUSED(tensors);
 

@@ -443,6 +443,9 @@ void test_unary(tensor_unary_type_t tensor_unary_type)
                 }
                 ck_assert_ptr_null(error);
 
+                error = tensor_evaluate(returned_tensors[i][j][k]);
+                ck_assert_ptr_null(error);
+
                 if (tensor_unary_type == TENSOR_CONTIGUOUS)
                 {
                     ck_assert_tensor_eq(returned_tensors[i][j][k], expected_tensors[i][j][k]);

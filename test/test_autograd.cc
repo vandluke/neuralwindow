@@ -225,16 +225,23 @@ START_TEST(test_feed_forward_neural_network)
                         error = tensor_rectified_linear(returned_tensors_j[i][j][k][l], &returned_tensors[i][j][k][l]);
                     }
                     ck_assert_ptr_null(error);
-                    
+
+                    error = tensor_evaluate(returned_tensors[i][j][k][l]);
+                    ck_assert_ptr_null(error);
+
                     expected_tensors[i][j][k][l] = torch_to_tensor(expected_tensor, (runtime_t) i, (datatype_t) j);
 
                     ck_assert_tensor_equiv(returned_tensors[i][j][k][l], expected_tensors[i][j][k][l]);
                 }
-                
+
                 // Backward Propogation
                 torch::neg(torch::mean(torch::sum(torch::mul(expected_tensor, torch_output[i][j][k]), -1))).backward();
                 error = negative_log_likelihood(output[i][j][k], returned_tensors[i][j][k][LAYERS - 1], &cost[i][j][k]);
                 ck_assert_ptr_null(error);
+
+                error = tensor_evaluate(cost[i][j][k]);
+                ck_assert_ptr_null(error);
+
                 error = tensor_backward(cost[i][j][k], NULL);
                 ck_assert_ptr_null(error);
 

@@ -477,6 +477,9 @@ void test_reduction(tensor_reduction_type_t tensor_reduction_type, bool_t test_g
                     }
                     ck_assert_ptr_null(error);
 
+                    error = tensor_evaluate(returned_tensors[i][j][k][l]);
+                    ck_assert_ptr_null(error);
+
                     ck_assert_tensor_equiv(returned_tensors[i][j][k][l],
                                            expected_tensors[i][j][k][l]);
 

@@ -43,8 +43,8 @@ nw_error_t *deque_push_front(deque_t *deque, void *data)
 {
     CHECK_NULL_ARGUMENT(deque, "deque");
 
-    element_t *element;
-    nw_error_t *error = element_create(&element, data);
+    d_element_t *element;
+    nw_error_t *error = d_element_create(&element, data);
     if (error)
     {
         return ERROR(ERROR_CREATE, string_create("failed to create element."), error);
@@ -76,8 +76,8 @@ nw_error_t *deque_pop_front(deque_t *deque, void **data)
     }
 
     *data = deque->head->data;
-    element_t *element = deque->head->next;
-    element_destroy(deque->head);
+    d_element_t *element = deque->head->next;
+    d_element_destroy(deque->head);
     deque->head = element;
     deque->head->prev = NULL;
     deque->size--;
@@ -89,8 +89,8 @@ nw_error_t *deque_push_back(deque_t *deque, void *data)
 {
     CHECK_NULL_ARGUMENT(deque, "deque");
 
-    element_t *element;
-    nw_error_t *error = element_create(&element, data);
+    d_element_t *element;
+    nw_error_t *error = d_element_create(&element, data);
     if (error)
     {
         return ERROR(ERROR_CREATE, string_create("failed to create element."), error);
@@ -122,8 +122,8 @@ nw_error_t *deque_pop_back(deque_t *deque, void **data)
     }
 
     *data = deque->tail->data;
-    element_t *element = deque->tail->prev;
-    element_destroy(deque->tail);
+    d_element_t *element = deque->tail->prev;
+    d_element_destroy(deque->tail);
     deque->tail = element;
     deque->tail->next = NULL;
     deque->size--;

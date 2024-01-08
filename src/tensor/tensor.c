@@ -1068,17 +1068,9 @@ nw_error_t *tensor_item(const tensor_t *x, void *value)
     CHECK_NULL_ARGUMENT(x->buffer->view, "x->buffer->view");
     CHECK_NULL_ARGUMENT(value, "value");
 
-    nw_error_t *error;
-
     if (x->buffer->view->rank)
     {
         return ERROR(ERROR_RANK, string_create("tensor must be rank zero."), NULL);
-    }
-
-    error = tensor_evaluate(x);
-    if (error != NULL)
-    {
-        return ERROR(ERROR_EVALUATE, string_create("failed to evaluate tensor operations.", NULL))
     }
 
     switch (x->buffer->storage->datatype)
@@ -2591,6 +2583,11 @@ nw_error_t *tensor_create_empty(tensor_t **x, const int64_t *shape, int64_t rank
     return error;
 }
 
+/**
+ * @brief Evaluate forward pass of operations on all tensors in tensor x's DAG.
+ * Should be called before all data accesses.
+ * @param x[in] the tensor to use as a starting point in the DAG.
+ */
 nw_error_t *tensor_evaluate(tensor_t *x)
 {
     CHECK_NULL_ARGUMENT(x, "x");
@@ -2624,7 +2621,7 @@ nw_error_t *tensor_evaluate(tensor_t *x)
     }
 
     // TODO: reconstruct the deque with the appropriate combined operations
-    error = function_optimize(tensors);
+    error = function_schedule(tensors);
     if (error)
     {
         error = ERROR(ERROR_OPTIMIZE, string_create("failed to optimize operations."), error);
@@ -2644,7 +2641,7 @@ nw_error_t *tensor_evaluate(tensor_t *x)
         // Creation operations are handled immediately.
         if (y->context && (y->context->operation_type != CREATION_OPERATION))
         {
-            error = function_forward(y->context, y);
+            error = function_forward(y->context, &y);
             if (error)
             {
                 error = ERROR(ERROR_FORWARD, string_create("failed to do forward pass."), error);
@@ -2654,6 +2651,11 @@ nw_error_t *tensor_evaluate(tensor_t *x)
     }
 
     function_synchronize(x);
+
+cleanup:
+
+    map_destroy(visited);
+    deque_destroy(tensors);
 
     return error;
 }

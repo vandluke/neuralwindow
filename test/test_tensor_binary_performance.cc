@@ -289,16 +289,25 @@ void performance_test(std::string op_name, datatype_t datatype,
                     tensor_x = torch_to_tensor(torch_tensor_x, (runtime_t) i, datatype);
                     tensor_y = torch_to_tensor(torch_tensor_y, (runtime_t) i, datatype);
 
+                    // Time PyTorch
                     torch_start = get_time_nanoseconds();
+
                     torch::Tensor expected_tensor = torch_op(torch_tensor_x, torch_tensor_y);
+
                     torch_end = get_time_nanoseconds();
 
                     returned_tensor = torch_to_tensor(expected_tensor, (runtime_t) i, datatype);
 
+                    // Time NeuralWindow
                     nw_start = get_time_nanoseconds();
+
                     error = nw_op(tensor_x, tensor_y, &returned_tensor);
-                    nw_end = get_time_nanoseconds();
                     ck_assert_ptr_null(error);
+
+                    error = tensor_evaluate(returned_tensor);
+                    ck_assert_ptr_null(error);
+
+                    nw_end = get_time_nanoseconds();
 
                     tensor_destroy(tensor_x);
                     tensor_destroy(tensor_y);
@@ -553,16 +562,23 @@ void performance_test(std::string op_name, datatype_t datatype,
                     tensor_x = torch_to_tensor(torch_tensor_x, (runtime_t) i, datatype);
                     tensor_y = torch_to_tensor(torch_tensor_y, (runtime_t) i, datatype);
 
+                    // Time PyTorch
                     torch_start = get_time_nanoseconds();
                     torch::Tensor expected_tensor = torch_op(torch_tensor_x, torch_tensor_y);
                     torch_end = get_time_nanoseconds();
 
                     returned_tensor = torch_to_tensor(expected_tensor, (runtime_t) i, datatype);
 
+                    // Time NeuralWindow
                     nw_start = get_time_nanoseconds();
+
                     error = nw_op(tensor_x, tensor_y, &returned_tensor);
-                    nw_end = get_time_nanoseconds();
                     ck_assert_ptr_null(error);
+
+                    error = tensor_evaluate(returned_tensor);
+                    ck_assert_ptr_null(error);
+
+                    nw_end = get_time_nanoseconds();
 
                     tensor_destroy(tensor_x);
                     tensor_destroy(tensor_y);

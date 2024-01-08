@@ -972,6 +972,9 @@ void test_binary(binary_operation_class_t binary_operation_class,
                 }
                 ck_assert_ptr_null(error);
 
+                error = tensor_evaluate(returned_tensors[i][j][k]);
+                ck_assert_ptr_null(error);
+
                 ck_assert_tensor_equiv(returned_tensors[i][j][k], expected_tensors[i][j][k]);
 
                 if (!test_gradient)

@@ -308,21 +308,30 @@ void performance_test(std::string op_name, datatype_t datatype,
 
                     tensor = torch_to_tensor(torch_tensor, (runtime_t) i, datatype);
 
+                    // Time PyTorch
                     torch_start = get_time_nanoseconds();
+
                     expected_tensor = torch_op(torch_tensor, axis, keep_dimension);
+
                     torch_end = get_time_nanoseconds();
 
                     returned_tensor = torch_to_tensor(expected_tensor, (runtime_t) i, datatype);
                     intermediate_tensor = returned_tensor;
 
+                    // Time NeuralWindow
                     nw_start = get_time_nanoseconds();
+
                     error = nw_op(tensor,
                             &returned_tensor,
                             (int64_t *) axis.data(),
                             (int64_t) axis.size(),
                             keep_dimension);
-                    nw_end = get_time_nanoseconds();
                     ck_assert_ptr_null(error);
+
+                    error = tensor_evaluate(returned_tensor);
+                    ck_assert_ptr_null(error);
+
+                    nw_end = get_time_nanoseconds();
 
                     // Deal with the nasty case of tensor_contiguous returning
                     // itself.
@@ -597,17 +606,26 @@ void performance_test(std::string op_name, datatype_t datatype,
 
                     tensor = torch_to_tensor(torch_tensor, (runtime_t) i, datatype);
 
+                    // Time PyTorch
                     torch_start = get_time_nanoseconds();
+
                     expected_tensor = torch_op(torch_tensor, axis);
+
                     torch_end = get_time_nanoseconds();
 
                     returned_tensor = torch_to_tensor(expected_tensor, (runtime_t) i, datatype);
                     intermediate_tensor = returned_tensor;
 
+                    // Time NeuralWindow
                     nw_start = get_time_nanoseconds();
+
                     error = nw_op(tensor, &returned_tensor, (uint64_t) axis);
-                    nw_end = get_time_nanoseconds();
                     ck_assert_ptr_null(error);
+
+                    error = tensor_evaluate(returned_tensor);
+                    ck_assert_ptr_null(error);
+
+                    nw_end = get_time_nanoseconds();
 
                     // Deal with the nasty case of tensor_contiguous returning
                     // itself.

@@ -219,11 +219,24 @@ nw_error_t *mnist_metrics(dataset_type_t dataset_type,
         time = get_time_nanoseconds();
     }
 
+    // TODO: Check if we only need one tensor_evaluate call.
+    error = tensor_evaluate(accuracy);
+    if (error != NULL)
+    {
+        return ERROR(ERROR_EVALUATE, string_create("failed to evaluate accuracy operations."), NULL);
+    }
+
     error = tensor_item(accuracy, accuracy_data + (iteration - 1) * datatype_size(datatype));
     if (error)
     {
         error = ERROR(ERROR_ITEM, string_create("failed to get tensor item."), NULL);
         goto cleanup;
+    }
+
+    error = tensor_evaluate(accuracy);
+    if (error != NULL)
+    {
+        return ERROR(ERROR_EVALUATE, string_create("failed to evaluate accuracy operations."), NULL);
     }
 
     error = tensor_item(cost, cost_data + (iteration - 1) * datatype_size(datatype));
