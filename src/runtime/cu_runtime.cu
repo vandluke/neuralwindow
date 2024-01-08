@@ -15,7 +15,7 @@ extern "C" {
 #include <magma_v2.h>
 
 #ifndef SYNCHRONOUS
-#define SYNCHRONOUS 1
+#define SYNCHRONOUS 0
 #endif
 
 #define EPSILON 1e-7
@@ -96,6 +96,11 @@ extern "C" nw_error_t *cu_memory_allocate(void **pp, size_t size)
 extern "C" void cu_memory_free(void *p)
 {
     cudaFree(p);
+}
+
+extern "C" void cu_synchronize(void)
+{
+    cudaDeviceSynchronize();
 }
 
 __global__ static void cu_exponential_float32(int n, const float32_t *x_data, int x_stride, float32_t *y_data, int y_stride)

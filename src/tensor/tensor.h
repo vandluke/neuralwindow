@@ -100,6 +100,9 @@ nw_error_t *tensor_rectified_linear(const tensor_t *x, tensor_t **y);
 nw_error_t *tensor_sigmoid(const tensor_t *x, tensor_t **y);
 nw_error_t *tensor_as_tensor(const tensor_t *x, tensor_t **y);
 
+// Evaluate Forward Pass
+nw_error_t *tensor_evaluate(tensor_t *x);
+
 // Back Propogation
 nw_error_t *tensor_backward(tensor_t *x, tensor_t *gradient);
 nw_error_t *tensor_accumulate_gradient(tensor_t *x, tensor_t *gradient);

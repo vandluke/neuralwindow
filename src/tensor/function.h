@@ -81,6 +81,8 @@ nw_error_t *apply_operation_reduction(reduction_operation_type_t reduction_opera
 nw_error_t *apply_operation_structure(structure_operation_type_t structure_operation_type, const tensor_t *x, const int64_t *arguments, int64_t length, tensor_t **result);
 nw_error_t *apply_operation_creation(creation_operation_type_t creation_operation_type, const int64_t *shape, int64_t rank, runtime_t runtime, datatype_t datatype,
                                      bool_t requires_gradient, bool_t persist, const void **arguments, int64_t length, void *data, tensor_t **result);
+nw_error_t *apply_forward(tensor_t **result);
 nw_error_t *apply_backward(tensor_t *result);
+nw_error_t *apply_synchronize(function_t *function);
 
 #endif

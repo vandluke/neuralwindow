@@ -1068,9 +1068,17 @@ nw_error_t *tensor_item(const tensor_t *x, void *value)
     CHECK_NULL_ARGUMENT(x->buffer->view, "x->buffer->view");
     CHECK_NULL_ARGUMENT(value, "value");
 
+    nw_error_t *error;
+
     if (x->buffer->view->rank)
     {
         return ERROR(ERROR_RANK, string_create("tensor must be rank zero."), NULL);
+    }
+
+    error = tensor_evaluate(x);
+    if (error != NULL)
+    {
+        return ERROR(ERROR_EVALUATE, string_create("failed to evaluate tensor operations.", NULL))
     }
 
     switch (x->buffer->storage->datatype)
@@ -2588,7 +2596,6 @@ nw_error_t *tensor_evaluate(tensor_t *x)
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(x->buffer, "x->buffer");
     CHECK_NULL_ARGUMENT(x->buffer->view, "x->buffer->view");
-    //CHECK_NULL_ARGUMENT(x->buffer->actual, "x->buffer->actual");
 
     nw_error_t *error = NULL;
     deque_t *tensors = NULL;
@@ -2624,7 +2631,7 @@ nw_error_t *tensor_evaluate(tensor_t *x)
         goto cleanup;
     }
 
-    // Propogate data for the forward pass.
+    // Propagate data for the forward pass.
     while (tensors->size > 0)
     {
         error = deque_pop_back(tensors, (void **) &y);
@@ -2634,7 +2641,8 @@ nw_error_t *tensor_evaluate(tensor_t *x)
             goto cleanup;
         }
 
-        if (y->context)
+        // Creation operations are handled immediately.
+        if (y->context && (y->context->operation_type != CREATION_OPERATION))
         {
             error = function_forward(y->context, y);
             if (error)
@@ -2644,6 +2652,8 @@ nw_error_t *tensor_evaluate(tensor_t *x)
             }
         }
     }
+
+    function_synchronize(x);
 
     return error;
 }

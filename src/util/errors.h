@@ -103,6 +103,7 @@
     PRINT_DEBUG_NEWLINE;\
 } while(0)
 
+//TODO: Might need to be synchronized wherever its called.
 #define PRINT_DEBUG_STORAGE(storage) do {\
     if (!(storage))\
     {\
@@ -594,6 +595,8 @@ typedef enum nw_error_type_t
     ERROR_CONTIGUOUS,
     ERROR_FORWARD,
     ERROR_BACKWARD,
+    ERROR_CONTEXT,
+    ERROR_EVALUATE,
     ERROR_SET,
     ERROR_OVERFLOW,
     ERROR_EXPAND,

@@ -51,6 +51,24 @@ void runtime_destroy_context(runtime_t runtime)
     }
 }
 
+// TODO: Stream logic will change signature.
+void runtime_synchronize(runtime_t runtime)
+{
+    switch (runtime)
+    {
+    case OPENBLAS_RUNTIME:
+    case MKL_RUNTIME:
+        break;
+#ifndef CPU_ONLY
+    case CU_RUNTIME:
+        cu_synchronize();
+        break;
+#endif
+    default:
+        break;
+    }
+}
+
 nw_error_t *runtime_malloc(void **data, int64_t n, datatype_t datatype, runtime_t runtime)
 {
     if (!n)
