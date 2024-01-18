@@ -2127,6 +2127,100 @@ cleanup:
     return error;
 }
 
+/**Construct the deque of tensors used in the forward pass of the provided
+ * tensor.
+ *
+ * @param tensor[in] the parent tensor.
+ * @param visited[out] the map of visited tensor ids.
+ * @param tensors[out] the resulting deque of visited tensors.
+ */
+static nw_error_t *tensor_schedule(tensor_t *tensor, int stream_id)
+{
+    PRINTLN_DEBUG_LOCATION("input");
+    PRINTLN_DEBUG_TENSOR("tensor", tensor);
+    PRINT_DEBUG_NEWLINE;
+
+    CHECK_NULL_ARGUMENT(tensor, "tensor");
+
+    nw_error_t *error = NULL;
+    function_t *context = tensor->context;
+
+    if (context)
+    {
+        operation_t *operation = tensor->context->operation;
+        operation_type_t operation_type = tensor->context->operation_type;
+
+        switch (operation_type)
+        {
+        case UNARY_OPERATION:
+            if (operation->unary_operation != NULL)
+            {
+                error = tensor_schedule(operation->unary_operation->x, stream_id);
+            }
+            else
+            {
+                return ERROR(ERROR_NULL, string_create("operation is null."), NULL);
+            }
+            break;
+        case BINARY_OPERATION:
+            if (operation->binary_operation != NULL)
+            {
+                error = tensor_schedule(operation->binary_operation->x, stream_id);
+                if (error == NULL)
+                {
+                    error = tensor_schedule(operation->binary_operation->y, stream_id + 1);
+                }
+                function_synchronize(stream_id);
+                function_synchronize(stream_id + 1);
+            }
+            else
+            {
+                return ERROR(ERROR_NULL, string_create("operation is null."), NULL);
+            }
+            break;
+        case REDUCTION_OPERATION:
+            if (operation->reduction_operation)
+            {
+                error = tensor_schedule(operation->reduction_operation->x, stream_id);
+            }
+            else
+            {
+                return ERROR(ERROR_NULL, string_create("operation is null."), NULL);
+            }
+            break;
+        case STRUCTURE_OPERATION:
+            if (operation->structure_operation)
+            {
+                error = tensor_schedule(operation->structure_operation->x, stream_id);
+            }
+            else
+            {
+                return ERROR(ERROR_NULL, string_create("operation is null."), NULL);
+            }
+            break;
+        case CREATION_OPERATION:
+            // Leaf node
+            break;
+        default:
+            return ERROR(ERROR_UKNOWN_OPERATION_TYPE, string_create("unknown operation type %d.", (int) operation_type), NULL);
+            break;
+        }
+
+        if (error != NULL)
+        {
+            error = ERROR(ERROR_FORWARD, string_create("failed to evaluate forward pass for tensor."), error);
+        }
+
+        error = function_forward(context, &tensor, stream_id);
+        if (error != NULL)
+        {
+            error = ERROR(ERROR_FORWARD, string_create("failed to evaluate forward pass for tensor."), error);
+        }
+    }
+
+    return error;
+}
+
 nw_error_t *tensor_arange(tensor_t **x, void *start, void *stop, void *step, runtime_t runtime, datatype_t datatype, bool_t requires_gradient, bool_t persist)
 {
     PRINTLN_DEBUG_LOCATION("input");
@@ -2595,67 +2689,22 @@ nw_error_t *tensor_evaluate(tensor_t *x)
     CHECK_NULL_ARGUMENT(x->buffer->view, "x->buffer->view");
 
     nw_error_t *error = NULL;
-    deque_t *tensors = NULL;
-    map_t *visited = NULL;
-    tensor_t *y = NULL;
 
-    error = deque_create(&tensors);
-    if (error)
+    it (!no_lazy_eval)
     {
-        error = ERROR(ERROR_CREATE, string_create("failed to create deque."), error);
-        goto cleanup;
-    }
-
-    error = map_create(&visited);
-    if (error)
-    {
-        error = ERROR(ERROR_CREATE, string_create("failed to create map."), error);
-        goto cleanup;
-    }
-
-    error = topological_sort(x, visited, tensors);
-    if (error)
-    {
-        error = ERROR(ERROR_SORT, string_create("failed to topologically sort tensors."), error);
-        goto cleanup;
-    }
-
-    // TODO: reconstruct the deque with the appropriate combined operations
-    error = function_schedule(tensors);
-    if (error)
-    {
-        error = ERROR(ERROR_OPTIMIZE, string_create("failed to optimize operations."), error);
-        goto cleanup;
-    }
-
-    // Propagate data for the forward pass.
-    while (tensors->size > 0)
-    {
-        error = deque_pop_back(tensors, (void **) &y);
-        if (error)
+        error = tensor_schedule(x, 0);
+        if (error != NULL)
         {
-            error = ERROR(ERROR_POP, string_create("failed to pop tensor from deque"), error);
-            goto cleanup;
+            error = ERROR(ERROR_FORWARD, string_create("failed to evaluate forward pass for tensor."), error);
         }
 
-        // Creation operations are handled immediately.
-        if (y->context && (y->context->operation_type != CREATION_OPERATION))
+        // Wait until all ops on x are complete.
+        error = function_synchronize(x, 0);
+        if (error != NULL)
         {
-            error = function_forward(y->context, &y);
-            if (error)
-            {
-                error = ERROR(ERROR_FORWARD, string_create("failed to do forward pass."), error);
-                goto cleanup;
-            }
+            error = ERROR(ERROR_FORWARD, string_create("failed to synchronize at end of forward pass for tensor."), error);
         }
     }
-
-    function_synchronize(x);
-
-cleanup:
-
-    map_destroy(visited);
-    deque_destroy(tensors);
 
     return error;
 }

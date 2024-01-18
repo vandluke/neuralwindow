@@ -52,6 +52,72 @@ void function_destroy(function_t *function)
     }
 }
 
+static nw_error_t *operation_before(operation_t *operation, operation_type_t operation_type, tensor_t **result)
+{
+    CHECK_NULL_ARGUMENT(operation, "operation");
+    CHECK_NULL_ARGUMENT(operation_type, "operation_type");
+
+    switch (operation_type)
+    {
+    case UNARY_OPERATION:
+        error = buffer_unary_before(operation->unary_operation->operation_type,
+                                    operation->unary_operation->x->buffer,
+                                    &(*result)->buffer);
+        break;
+    case BINARY_OPERATION:
+        error = buffer_binary_before(operation->binary_operation->operation_type,
+                                     operation->binary_operation->x->buffer,
+                                     operation->binary_operation->y->buffer,
+                                     &(*result)->buffer);
+        break;
+    case REDUCTION_OPERATION:
+        error = buffer_reduction_before(operation->reduction_operation->operation_type,
+                                        operation->reduction_operation->x->buffer,
+                                        operation->reduction_operation->axis,
+                                        operation->reduction_operation->length,
+                                        &(*result)->buffer,
+                                        operation->reduction_operation->keep_dimension);
+        break;
+    case STRUCTURE_OPERATION:
+        error = buffer_structure_before(operation->structure_operation->operation_type,
+                                        operation->structure_operation->x->buffer,
+                                        operation->structure_operation->shape,
+                                        operation->structure_operation->length,
+                                        &(*result)->buffer);
+        break;
+    case CREATION_OPERATION:
+        break;
+    default:
+        error = ERROR(ERROR_UKNOWN_OPERATION_TYPE, string_create("unknown operation type %d.", (int) operation_type), NULL);
+    }
+
+
+    if (error != NULL)
+    {
+        error = ERROR(ERROR_SETUP,
+                      string_create("failed to setup buffer for forward pass."),
+                      error);
+        return error;
+    }
+}
+
+static nw_error_t *function_before(function_t *function, tensor_t **result)
+{
+    CHECK_NULL_ARGUMENT(function, "function");
+    CHECK_NULL_ARGUMENT(result, "result");
+
+    error = operation_before(function->operation, function->operation_type, result);
+    if (error != NULL)
+    {
+        error = ERROR(ERROR_SETUP,
+                      string_create("failed to setup operation for forward pass."),
+                      error);
+        return error;
+    }
+
+    return NULL;
+}
+
 /**
  * @brief Execute the operation of a generic function.
  * @param operation_type The type of operation being applied.
@@ -67,6 +133,17 @@ static nw_error_t *apply_function(operation_type_t operation_type, void *type_op
     nw_error_t *error = NULL;
     operation_t *operation = NULL;
     function_t *function = NULL;
+    bool_t overwrite = (bool_t) *result;
+
+    if (!overwrite)
+    {
+        error = tensor_create_null(result);
+        if (error)
+        {
+            error = ERROR(ERROR_CREATE, string_create("failed to create tensor."), error);
+            goto cleanup;
+        }
+    }
 
     error = operation_create(&operation, operation_type, type_operation);
     if (error)
@@ -86,32 +163,26 @@ static nw_error_t *apply_function(operation_type_t operation_type, void *type_op
         goto cleanup;
     }
 
-    // TODO: Might have unwanted consequences due to CREATION_OPERATION(s)
-    // starting subsequent operations.
-    if (operation_type == CREATION_OPERATION)
+    error = function_before(function, result);
+    if (error)
     {
-        error = function_forward(function, result);
-        if (error)
-        {
-            error = ERROR(ERROR_FORWARD,
-                          string_create("failed to execute function forward pass of type %s.",
-                          operation_type_string(operation_type)), error);
-            goto cleanup;
-        }
+        error = ERROR(ERROR_SETUP,
+                      string_create("failed to setup operation for forward pass."),
+                      error);
+        goto cleanup;
     }
 
-    if ((*result)->requires_gradient && !no_gradient)
+    if ((operation_type == CREATION_OPERATION) || no_lazy_eval)
     {
-        if ((*result)->context)
-        {
-            function_destroy((*result)->context, true);
-        }
-        (*result)->context = function;
+        // Run forward pass with one stream.
+        function_forward(function, result, 0);
     }
-    else
+
+    if ((*result)->context)
     {
-        function_destroy(function, true);
+        function_destroy((*result)->context, true);
     }
+    (*result)->context = function;
 
     return error;
 
@@ -439,7 +510,7 @@ cleanup:
  *         Error if operation failed to execute.
  *         NULL if function successfully executed.
  */
-static nw_error_t *function_forward(function_t *function, tensor_t **result)
+static nw_error_t *function_forward(function_t *function, tensor_t **result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(function, "function");
     CHECK_NULL_ARGUMENT(function->operation, "function->operation");
@@ -449,12 +520,19 @@ static nw_error_t *function_forward(function_t *function, tensor_t **result)
     operation_type_t operation_type = function->operation_type;
     operation_t *operation= function->operation;
 
-    error = operation_forward(operation, operation_type, result);
+    error = operation_forward(operation, operation_type, result, stream_id);
     if (error)
     {
         return ERROR(ERROR_FORWARD,
                      string_create("failed to execute operation forward pass of type %s.",
                      operation_type_string(function->operation_type)), error);
+    }
+
+    // TODO: Check if this was in mainline...
+    if (!(*result)->requires_gradient || no_gradient)
+    {
+        function_destroy(function);
+        result->context = NULL;
     }
 
     return error;
@@ -489,15 +567,17 @@ nw_error_t *function_backward(function_t *function, tensor_t *gradient)
 /**
  * @brief Function level API for synchronization of operations on a tensor.
  * @param tensor[in] the tensor.
+ * @param stream_id[in] the runtime stream to synchronize on. -1 for the default
+ * stream.
  * @return Error if `tensor`, `tensor->buffer`, or `tensor->storage` is NULL.
  *         NULL if operation was successfully created.
  */
-nw_error_t *apply_synchronize(tensor_t *tensor) {
+nw_error_t *apply_synchronize(tensor_t *tensor, int stream_id) {
     CHECK_NULL_ARGUMENT(tensor, "tensor");
     CHECK_NULL_ARGUMENT(tensor->buffer, "tensor->buffer");
     CHECK_NULL_ARGUMENT(tensor->buffer->storage, "tensor->buffer->storage");
 
-    runtime_synchronize(tensor->buffer->storage->runtime);
+    runtime_synchronize(tensor->buffer->storage->runtime, stream_id);
 
     return NULL;
 }
@@ -615,7 +695,7 @@ string_t operation_type_string(operation_type_t operation_type)
  *         Error if `operation` failed to execute.
  *         NULL if `operation` ran successfully.
  */
-nw_error_t *operation_forward(operation_t *operation, operation_type_t operation_type, tensor_t **result)
+nw_error_t *operation_forward(operation_t *operation, operation_type_t operation_type, tensor_t **result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(operation, "operation");
     CHECK_NULL_ARGUMENT(result, "result");
@@ -625,13 +705,13 @@ nw_error_t *operation_forward(operation_t *operation, operation_type_t operation
     switch (operation_type)
     {
     case UNARY_OPERATION:
-        error = unary_operation_forward(operation->unary_operation, result);
+        error = unary_operation_forward(operation->unary_operation, result, stream_id);
         break;
     case BINARY_OPERATION:
-        error = binary_operation_forward(operation->binary_operation, result);
+        error = binary_operation_forward(operation->binary_operation, result, stream_id);
         break;
     case REDUCTION_OPERATION:
-        error = reduction_operation_forward(operation->reduction_operation, result);
+        error = reduction_operation_forward(operation->reduction_operation, result, stream_id);
         break;
     case STRUCTURE_OPERATION:
         error = structure_operation_forward(operation->structure_operation, result);
@@ -788,14 +868,14 @@ string_t unary_operation_type_string(unary_operation_type_t unary_operation_type
  *         Error if exponential operation failed.
  *         NULL if exponential operation was successfully applied.
  */
-static nw_error_t *exponential_operation_forward(tensor_t *x, tensor_t *result)
+static nw_error_t *exponential_operation_forward(tensor_t *x, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(result, "result");
 
     nw_error_t *error = NULL;
 
-    error = buffer_unary(EXPONENTIAL_OPERATION, x->buffer, &result->buffer);
+    error = buffer_unary(EXPONENTIAL_OPERATION, x->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_EXPONENTIAL, string_create("failed to run exponential operation."), error);
@@ -854,14 +934,14 @@ cleanup:
  *         Error if logarithm operation failed.
  *         NULL if logarithm operation was successfully applied.
  */
-static nw_error_t *logarithm_operation_forward(tensor_t *x, tensor_t *result)
+static nw_error_t *logarithm_operation_forward(tensor_t *x, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(result, "result");
 
     nw_error_t *error = NULL;
 
-    error = buffer_unary(LOGARITHM_OPERATION, x->buffer, &result->buffer);
+    error = buffer_unary(LOGARITHM_OPERATION, x->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_LOGARITHM, string_create("failed to run logarithm operation."), error);
@@ -917,14 +997,14 @@ cleanup:
  *         Error if sine operation failed.
  *         NULL if sine operation was successfully applied.
  */
-static nw_error_t *sine_operation_forward(tensor_t *x, tensor_t *result)
+static nw_error_t *sine_operation_forward(tensor_t *x, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(result, "result");
 
     nw_error_t *error = NULL;
 
-    error = buffer_unary(SINE_OPERATION, x->buffer, &result->buffer);
+    error = buffer_unary(SINE_OPERATION, x->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_SINE, string_create("failed to run sine operation."), error);
@@ -981,14 +1061,14 @@ cleanup:
     return error;
 }
 
-static nw_error_t *cosine_operation_forward(tensor_t *x, tensor_t *result)
+static nw_error_t *cosine_operation_forward(tensor_t *x, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(result, "result");
 
     nw_error_t *error = NULL;
 
-    error = buffer_unary(COSINE_OPERATION, x->buffer, &result->buffer);
+    error = buffer_unary(COSINE_OPERATION, x->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_COSINE, string_create("failed to run cosine operation."), error);
@@ -1054,14 +1134,14 @@ cleanup:
     return error;
 }
 
-static nw_error_t *square_root_operation_forward(tensor_t *x, tensor_t *result)
+static nw_error_t *square_root_operation_forward(tensor_t *x, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(result, "result");
 
     nw_error_t *error = NULL;
 
-    error = buffer_unary(SQUARE_ROOT_OPERATION, x->buffer, &result->buffer);
+    error = buffer_unary(SQUARE_ROOT_OPERATION, x->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_SQUARE_ROOT, string_create("failed to run square root operation."), error);
@@ -1155,14 +1235,14 @@ cleanup:
     return error;
 }
 
-static nw_error_t *reciprocal_operation_forward(tensor_t *x, tensor_t *result)
+static nw_error_t *reciprocal_operation_forward(tensor_t *x, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(result, "result");
 
     nw_error_t *error = NULL;
 
-    error = buffer_unary(RECIPROCAL_OPERATION, x->buffer, &result->buffer);
+    error = buffer_unary(RECIPROCAL_OPERATION, x->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_RECIPROCAL, string_create("failed to run reciprocal operation."), error);
@@ -1230,14 +1310,14 @@ cleanup:
     return error;
 }
 
-static nw_error_t *contiguous_operation_forward(tensor_t *x, tensor_t *result)
+static nw_error_t *contiguous_operation_forward(tensor_t *x, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(result, "result");
 
     nw_error_t *error = NULL;
 
-    error = buffer_unary(CONTIGUOUS_OPERATION, x->buffer, &result->buffer);
+    error = buffer_unary(CONTIGUOUS_OPERATION, x->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_CONTIGUOUS, string_create("failed to run contiguous operation."), error);
@@ -1265,14 +1345,14 @@ static nw_error_t *contiguous_operation_backward(tensor_t *x, tensor_t *gradient
     return error;
 }
 
-static nw_error_t *negation_operation_forward(tensor_t *x, tensor_t *result)
+static nw_error_t *negation_operation_forward(tensor_t *x, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(result, "result");
 
     nw_error_t *error = NULL;
 
-    error = buffer_unary(NEGATION_OPERATION, x->buffer, &result->buffer);
+    error = buffer_unary(NEGATION_OPERATION, x->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_NEGATION, string_create("failed to run negation operation."), error);
@@ -1313,14 +1393,14 @@ cleanup:
     return error;
 }
 
-static nw_error_t *rectified_linear_operation_forward(tensor_t *x, tensor_t *result)
+static nw_error_t *rectified_linear_operation_forward(tensor_t *x, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(result, "result");
 
     nw_error_t *error = NULL;
 
-    error = buffer_unary(RECTIFIED_LINEAR_OPERATION, x->buffer, &result->buffer);
+    error = buffer_unary(RECTIFIED_LINEAR_OPERATION, x->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_RECTIFIED_LINEAR, string_create("failed to run rectified linear operation."), error);
@@ -1421,14 +1501,14 @@ cleanup:
     return error;
 }
 
-static nw_error_t *sigmoid_operation_forward(tensor_t *x, tensor_t *result)
+static nw_error_t *sigmoid_operation_forward(tensor_t *x, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(result, "result");
 
     nw_error_t *error = NULL;
 
-    error = buffer_unary(SIGMOID_OPERATION, x->buffer, &result->buffer);
+    error = buffer_unary(SIGMOID_OPERATION, x->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_SIGMOID, string_create("failed to run sigmoid operation."), error);
@@ -1537,7 +1617,7 @@ static nw_error_t *as_operation_forward(tensor_t *x, tensor_t *result)
     return error;
 }
 
-static nw_error_t *unary_operation_forward(unary_operation_t *unary_operation, tensor_t *result)
+static nw_error_t *unary_operation_forward(unary_operation_t *unary_operation, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(unary_operation, "unary_operation");
     CHECK_NULL_ARGUMENT(result, "result");
@@ -1547,34 +1627,34 @@ static nw_error_t *unary_operation_forward(unary_operation_t *unary_operation, t
     switch (unary_operation->operation_type)
     {
     case EXPONENTIAL_OPERATION:
-        error = exponential_operation_forward(unary_operation->x, result);
+        error = exponential_operation_forward(unary_operation->x, result, stream_id);
         break;
     case LOGARITHM_OPERATION:
-        error = logarithm_operation_forward(unary_operation->x, result);
+        error = logarithm_operation_forward(unary_operation->x, result, stream_id);
         break;
     case SINE_OPERATION:
-        error = sine_operation_forward(unary_operation->x, result);
+        error = sine_operation_forward(unary_operation->x, result, stream_id);
         break;
     case COSINE_OPERATION:
-        error = cosine_operation_forward(unary_operation->x, result);
+        error = cosine_operation_forward(unary_operation->x, result, stream_id);
         break;
     case SQUARE_ROOT_OPERATION:
-        error = square_root_operation_forward(unary_operation->x, result);
+        error = square_root_operation_forward(unary_operation->x, result, stream_id);
         break;
     case RECIPROCAL_OPERATION:
-        error = reciprocal_operation_forward(unary_operation->x, result);
+        error = reciprocal_operation_forward(unary_operation->x, result, stream_id);
         break;
     case CONTIGUOUS_OPERATION:
-        error = contiguous_operation_forward(unary_operation->x, result);
+        error = contiguous_operation_forward(unary_operation->x, result, stream_id);
         break;
     case NEGATION_OPERATION:
-        error = negation_operation_forward(unary_operation->x, result);
+        error = negation_operation_forward(unary_operation->x, result, stream_id);
         break;
     case RECTIFIED_LINEAR_OPERATION:
-        error = rectified_linear_operation_forward(unary_operation->x, result);
+        error = rectified_linear_operation_forward(unary_operation->x, result, stream_id);
         break;
     case SIGMOID_OPERATION:
-        error = sigmoid_operation_forward(unary_operation->x, result);
+        error = sigmoid_operation_forward(unary_operation->x, result, stream_id);
         break;
     case AS_OPERATION:
         error = as_operation_forward(unary_operation->x, result);
@@ -1648,7 +1728,7 @@ static nw_error_t *unary_operation_backward(unary_operation_t *unary_operation, 
     return error;
 }
 
-static nw_error_t *addition_operation_forward(const tensor_t *x, const tensor_t *y, tensor_t *result)
+static nw_error_t *addition_operation_forward(const tensor_t *x, const tensor_t *y, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(y, "y");
@@ -1656,7 +1736,7 @@ static nw_error_t *addition_operation_forward(const tensor_t *x, const tensor_t 
 
     nw_error_t *error = NULL;
 
-    error = buffer_binary(ADDITION_OPERATION, x->buffer, y->buffer, &result->buffer);
+    error = buffer_binary(ADDITION_OPERATION, x->buffer, y->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_ADDITION, string_create("failed to run addition operation."), error);
@@ -1694,7 +1774,7 @@ static nw_error_t *addition_operation_backward(tensor_t *x, tensor_t *y, tensor_
     return error;
 }
 
-static nw_error_t *subtraction_operation_forward(const tensor_t *x, const tensor_t *y, tensor_t *result)
+static nw_error_t *subtraction_operation_forward(const tensor_t *x, const tensor_t *y, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(y, "y");
@@ -1702,7 +1782,7 @@ static nw_error_t *subtraction_operation_forward(const tensor_t *x, const tensor
 
     nw_error_t *error = NULL;
 
-    error = buffer_binary(SUBTRACTION_OPERATION, x->buffer, y->buffer, &result->buffer);
+    error = buffer_binary(SUBTRACTION_OPERATION, x->buffer, y->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_SUBTRACTION, string_create("failed to run subtraction operation."), error);
@@ -1755,7 +1835,7 @@ cleanup:
     return error;
 }
 
-static nw_error_t *multiplication_operation_forward(const tensor_t *x, const tensor_t *y, tensor_t *result)
+static nw_error_t *multiplication_operation_forward(const tensor_t *x, const tensor_t *y, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(y, "y");
@@ -1763,7 +1843,7 @@ static nw_error_t *multiplication_operation_forward(const tensor_t *x, const ten
 
     nw_error_t *error = NULL;
 
-    error = buffer_binary(MULTIPLICATION_OPERATION, x->buffer, y->buffer, &result->buffer);
+    error = buffer_binary(MULTIPLICATION_OPERATION, x->buffer, y->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_MULTIPLICATION, string_create("failed to run multiplication operation."), error);
@@ -1824,7 +1904,7 @@ cleanup:
     return error;
 }
 
-static nw_error_t *division_operation_forward(const tensor_t *x, const tensor_t *y, tensor_t *result)
+static nw_error_t *division_operation_forward(const tensor_t *x, const tensor_t *y, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(y, "y");
@@ -1832,7 +1912,7 @@ static nw_error_t *division_operation_forward(const tensor_t *x, const tensor_t 
 
     nw_error_t *error = NULL;
 
-    error = buffer_binary(DIVISION_OPERATION, x->buffer, y->buffer, &result->buffer);
+    error = buffer_binary(DIVISION_OPERATION, x->buffer, y->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_DIVISION, string_create("failed to run division operation."), error);
@@ -1929,7 +2009,7 @@ cleanup:
     return error;
 }
 
-static nw_error_t *power_operation_forward(const tensor_t *x, const tensor_t *y, tensor_t *result)
+static nw_error_t *power_operation_forward(const tensor_t *x, const tensor_t *y, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(y, "y");
@@ -1937,7 +2017,7 @@ static nw_error_t *power_operation_forward(const tensor_t *x, const tensor_t *y,
 
     nw_error_t *error = NULL;
 
-    error = buffer_binary(POWER_OPERATION, x->buffer, y->buffer, &result->buffer);
+    error = buffer_binary(POWER_OPERATION, x->buffer, y->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_POWER, string_create("failed to run power operation."), error);
@@ -2034,7 +2114,7 @@ cleanup:
     return error;
 }
 
-static nw_error_t *matrix_multiplication_operation_forward(tensor_t *x, tensor_t *y, tensor_t *result)
+static nw_error_t *matrix_multiplication_operation_forward(tensor_t *x, tensor_t *y, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(y, "y");
@@ -2042,7 +2122,7 @@ static nw_error_t *matrix_multiplication_operation_forward(tensor_t *x, tensor_t
 
     nw_error_t *error = NULL;
 
-    error = buffer_binary(MATRIX_MULTIPLICATION_OPERATION, x->buffer, y->buffer, &result->buffer);
+    error = buffer_binary(MATRIX_MULTIPLICATION_OPERATION, x->buffer, y->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to run matrix multiplication operation."), error);
@@ -2129,7 +2209,7 @@ cleanup:
     return error;
 }
 
-static nw_error_t *compare_equal_operation_forward(const tensor_t *x, const tensor_t *y, tensor_t *result)
+static nw_error_t *compare_equal_operation_forward(const tensor_t *x, const tensor_t *y, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(y, "y");
@@ -2137,7 +2217,7 @@ static nw_error_t *compare_equal_operation_forward(const tensor_t *x, const tens
 
     nw_error_t *error = NULL;
 
-    error = buffer_binary(COMPARE_EQUAL_OPERATION, x->buffer, y->buffer, &result->buffer);
+    error = buffer_binary(COMPARE_EQUAL_OPERATION, x->buffer, y->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_COMPARE_EQUAL, string_create("failed to run compare equal operation."), error);
@@ -2146,7 +2226,7 @@ static nw_error_t *compare_equal_operation_forward(const tensor_t *x, const tens
     return error;
 }
 
-static nw_error_t *compare_greater_operation_forward(const tensor_t *x, const tensor_t *y, tensor_t *result)
+static nw_error_t *compare_greater_operation_forward(const tensor_t *x, const tensor_t *y, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(y, "y");
@@ -2154,7 +2234,7 @@ static nw_error_t *compare_greater_operation_forward(const tensor_t *x, const te
 
     nw_error_t *error = NULL;
 
-    error = buffer_binary(COMPARE_GREATER_OPERATION, x->buffer, y->buffer, &result->buffer);
+    error = buffer_binary(COMPARE_GREATER_OPERATION, x->buffer, y->buffer, &result->buffer, stream_id);
     if (error)
     {
         return ERROR(ERROR_COMPARE_GREATER, string_create("failed to run compare greater operation."), error);
@@ -2163,7 +2243,7 @@ static nw_error_t *compare_greater_operation_forward(const tensor_t *x, const te
     return error;
 }
 
-static nw_error_t *binary_operation_forward(binary_operation_t *binary_operation, tensor_t *result)
+static nw_error_t *binary_operation_forward(binary_operation_t *binary_operation, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(binary_operation, "binary_operation");
     CHECK_NULL_ARGUMENT(result, "result");
@@ -2173,28 +2253,28 @@ static nw_error_t *binary_operation_forward(binary_operation_t *binary_operation
     switch (binary_operation->operation_type)
     {
     case ADDITION_OPERATION:
-        error = addition_operation_forward(binary_operation->x, binary_operation->y, result);
+        error = addition_operation_forward(binary_operation->x, binary_operation->y, result, stream_id);
         break;
     case SUBTRACTION_OPERATION:
-        error = subtraction_operation_forward(binary_operation->x, binary_operation->y, result);
+        error = subtraction_operation_forward(binary_operation->x, binary_operation->y, result, stream_id);
         break;
     case MULTIPLICATION_OPERATION:
-        error = multiplication_operation_forward(binary_operation->x, binary_operation->y, result);
+        error = multiplication_operation_forward(binary_operation->x, binary_operation->y, result, stream_id);
         break;
     case DIVISION_OPERATION:
-        error = division_operation_forward(binary_operation->x, binary_operation->y, result);
+        error = division_operation_forward(binary_operation->x, binary_operation->y, result, stream_id);
         break;
     case POWER_OPERATION:
-        error = power_operation_forward(binary_operation->x, binary_operation->y, result);
+        error = power_operation_forward(binary_operation->x, binary_operation->y, result, stream_id);
         break;
     case MATRIX_MULTIPLICATION_OPERATION:
-        error = matrix_multiplication_operation_forward(binary_operation->x, binary_operation->y, result);
+        error = matrix_multiplication_operation_forward(binary_operation->x, binary_operation->y, result, stream_id);
         break;
     case COMPARE_EQUAL_OPERATION:
-        error = compare_equal_operation_forward(binary_operation->x, binary_operation->y, result);
+        error = compare_equal_operation_forward(binary_operation->x, binary_operation->y, result, stream_id);
         break;
     case COMPARE_GREATER_OPERATION:
-        error = compare_greater_operation_forward(binary_operation->x, binary_operation->y, result);
+        error = compare_greater_operation_forward(binary_operation->x, binary_operation->y, result, stream_id);
         break;
     default:
         error = ERROR(ERROR_OPERATION_TYPE, string_create("unsupported binary operation type %d.", (int) binary_operation->operation_type), NULL);
@@ -2255,7 +2335,7 @@ static nw_error_t *binary_operation_backward(binary_operation_t *binary_operatio
     return error;
 }
 
-static nw_error_t *summation_operation_forward(tensor_t *x, int64_t *axis, int64_t length, tensor_t *result, bool_t keep_dimension)
+static nw_error_t *summation_operation_forward(tensor_t *x, int64_t *axis, int64_t length, tensor_t *result, bool_t keep_dimension, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(axis, "axis");
@@ -2263,7 +2343,7 @@ static nw_error_t *summation_operation_forward(tensor_t *x, int64_t *axis, int64
 
     nw_error_t *error = NULL;
 
-    error = buffer_reduction(SUMMATION_OPERATION, x->buffer, axis, length, &result->buffer, keep_dimension);
+    error = buffer_reduction(SUMMATION_OPERATION, x->buffer, axis, length, &result->buffer, keep_dimension, stream_id);
     if (error)
     {
         return ERROR(ERROR_SUMMATION, string_create("failed to sum tensor."), error);
@@ -2338,7 +2418,7 @@ cleanup:
     return error; 
 }
 
-static nw_error_t *maximum_operation_forward(tensor_t *x, int64_t *axis, int64_t length, tensor_t *result, bool_t keep_dimension)
+static nw_error_t *maximum_operation_forward(tensor_t *x, int64_t *axis, int64_t length, tensor_t *result, bool_t keep_dimension, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(axis, "axis");
@@ -2346,7 +2426,7 @@ static nw_error_t *maximum_operation_forward(tensor_t *x, int64_t *axis, int64_t
 
     nw_error_t *error = NULL;
 
-    error = buffer_reduction(MAXIMUM_OPERATION, x->buffer, axis, length, &result->buffer, keep_dimension);
+    error = buffer_reduction(MAXIMUM_OPERATION, x->buffer, axis, length, &result->buffer, keep_dimension, stream_id);
     if (error)
     {
         return ERROR(ERROR_MAXIMUM, string_create("failed to get maximum of tensor."), error);
@@ -2483,7 +2563,7 @@ cleanup:
     return error; 
 }
 
-static nw_error_t *reduction_operation_forward(reduction_operation_t *reduction_operation, tensor_t *result)
+static nw_error_t *reduction_operation_forward(reduction_operation_t *reduction_operation, tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(reduction_operation, "reduction_operation");
 
@@ -2492,10 +2572,10 @@ static nw_error_t *reduction_operation_forward(reduction_operation_t *reduction_
     switch (reduction_operation->operation_type)
     {
     case SUMMATION_OPERATION:
-        error = summation_operation_forward(reduction_operation->x, reduction_operation->axis, reduction_operation->length, result, reduction_operation->keep_dimension);
+        error = summation_operation_forward(reduction_operation->x, reduction_operation->axis, reduction_operation->length, result, reduction_operation->keep_dimension, stream_id);
         break;
     case MAXIMUM_OPERATION:
-        error = maximum_operation_forward(reduction_operation->x, reduction_operation->axis, reduction_operation->length, result, reduction_operation->keep_dimension);
+        error = maximum_operation_forward(reduction_operation->x, reduction_operation->axis, reduction_operation->length, result, reduction_operation->keep_dimension, stream_id);
         break;
     default:
         error = ERROR(ERROR_OPERATION_TYPE, string_create("unknown operation type %d.", (int) reduction_operation->operation_type), NULL);
@@ -4112,13 +4192,13 @@ cleanup:
     return error;
 }
 
-nw_error_t *apply_forward(tensor_t *result)
+nw_error_t *apply_forward(tensor_t *result, int stream_id)
 {
     CHECK_NULL_ARGUMENT(result, "result");
 
     nw_error_t *error = NULL;
 
-    error = function_forward(result->context, result);
+    error = function_forward(result->context, result, stream_id);
     if (error)
     {
         return ERROR(ERROR_FORWARD, string_create("failed to apply forward."), error);
@@ -4140,15 +4220,4 @@ nw_error_t *apply_backward(tensor_t *result)
     }
 
     return error;
-}
-
-/**
- * @brief Reconstruct tensor deque with optimizations.
- * @param tensors The deque of tensors.
- */
-nw_error_t *function_schedule(deque_t *tensors)
-{
-    UNUSED(tensors);
-
-    return NULL;
 }

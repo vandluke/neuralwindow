@@ -52,7 +52,7 @@ void runtime_destroy_context(runtime_t runtime)
 }
 
 // TODO: Stream logic will change signature.
-void runtime_synchronize(runtime_t runtime)
+void runtime_synchronize(runtime_t runtime, int stream_id)
 {
     switch (runtime)
     {
@@ -61,7 +61,7 @@ void runtime_synchronize(runtime_t runtime)
         break;
 #ifndef CPU_ONLY
     case CU_RUNTIME:
-        cu_synchronize();
+        cu_synchronize(stream_id);
         break;
 #endif
     default:

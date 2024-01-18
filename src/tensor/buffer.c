@@ -55,6 +55,7 @@ void storage_destroy(storage_t *storage)
     {
         if (storage->reference_count < 2)
         {
+            runtime_synchronize(storage->runtime, -1);
             runtime_free(storage->data, storage->runtime);
             free(storage);
         }
@@ -63,6 +64,15 @@ void storage_destroy(storage_t *storage)
             --(storage->reference_count);
         }
     }
+}
+
+nw_error_t *storage_synchronize(storage_t *storage, int stream_id)
+{
+    CHECK_NULL_ARGUMENT(storage, "storage");
+
+    runtime_synchronize(storage->runtime, stream_id);
+
+    return NULL;
 }
 
 nw_error_t *buffer_create(buffer_t **buffer, view_t *view, storage_t *storage, bool_t copy)
@@ -109,17 +119,14 @@ void buffer_destroy(buffer_t *buffer)
     }
 }
 
-nw_error_t *buffer_unary(unary_operation_type_t unary_operation_type, buffer_t *x_buffer, buffer_t **y_buffer)
+nw_error_t *buffer_unary_before(unary_operation_type_t unary_operation_type, buffer_t *x_buffer, buffer_t **y_buffer)
 {
     CHECK_NULL_ARGUMENT(x_buffer, "x_buffer");
     CHECK_NULL_ARGUMENT(y_buffer, "y_buffer");
     CHECK_NULL_ARGUMENT(x_buffer->view, "x_buffer->view");
-    CHECK_NULL_ARGUMENT(x_buffer->view->strides, "x_buffer->view->strides");
-    CHECK_NULL_ARGUMENT(x_buffer->view->shape, "x_buffer->view->shape");
-    CHECK_NULL_ARGUMENT(x_buffer->storage, "x_buffer->storage");
-    CHECK_NULL_ARGUMENT(x_buffer->storage->data, "x_buffer->storage->data");
 
     nw_error_t *error = NULL;
+
     bool_t overwrite = (bool_t) *y_buffer;
 
     if (unary_operation_type == AS_OPERATION)
@@ -153,6 +160,28 @@ nw_error_t *buffer_unary(unary_operation_type_t unary_operation_type, buffer_t *
         }
     }
 
+cleanup:
+
+    if (!overwrite)
+    {
+        buffer_destroy(*y_buffer);
+    }
+
+    return error;
+}
+
+nw_error_t *buffer_unary(unary_operation_type_t unary_operation_type, buffer_t *x_buffer, buffer_t **y_buffer, int stream_id)
+{
+    CHECK_NULL_ARGUMENT(x_buffer, "x_buffer");
+    CHECK_NULL_ARGUMENT(y_buffer, "y_buffer");
+    CHECK_NULL_ARGUMENT(x_buffer->view, "x_buffer->view");
+    CHECK_NULL_ARGUMENT(x_buffer->view->strides, "x_buffer->view->strides");
+    CHECK_NULL_ARGUMENT(x_buffer->view->shape, "x_buffer->view->shape");
+    CHECK_NULL_ARGUMENT(x_buffer->storage, "x_buffer->storage");
+    CHECK_NULL_ARGUMENT(x_buffer->storage->data, "x_buffer->storage->data");
+
+    nw_error_t *error = NULL;
+
     datatype_t datatype = (*y_buffer)->storage->datatype;
     runtime_t runtime = (*y_buffer)->storage->runtime;
     int64_t rank = (*y_buffer)->view->rank;
@@ -173,7 +202,7 @@ nw_error_t *buffer_unary(unary_operation_type_t unary_operation_type, buffer_t *
         y_stride = 0;
         x_offset = x_buffer->view->offset;
         y_offset = (*y_buffer)->view->offset;
-        runtime_unary(unary_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+        runtime_unary(unary_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
         break;
     case 1:
         n = (*y_buffer)->view->shape[0];
@@ -181,7 +210,7 @@ nw_error_t *buffer_unary(unary_operation_type_t unary_operation_type, buffer_t *
         y_stride = (*y_buffer)->view->strides[0];
         x_offset = x_buffer->view->offset;
         y_offset = (*y_buffer)->view->offset;
-        runtime_unary(unary_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+        runtime_unary(unary_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
         break;
     case 2:
         for (int64_t i = 0; i < (*y_buffer)->view->shape[0]; ++i)
@@ -193,7 +222,7 @@ nw_error_t *buffer_unary(unary_operation_type_t unary_operation_type, buffer_t *
                        + i * x_buffer->view->strides[0];
             y_offset = (*y_buffer)->view->offset
                        + i * (*y_buffer)->view->strides[0];
-            runtime_unary(unary_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+            runtime_unary(unary_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
         }
         break;
     case 3:
@@ -210,7 +239,7 @@ nw_error_t *buffer_unary(unary_operation_type_t unary_operation_type, buffer_t *
                 y_offset = (*y_buffer)->view->offset
                            + i * (*y_buffer)->view->strides[0]
                            + j * (*y_buffer)->view->strides[1];
-                runtime_unary(unary_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+                runtime_unary(unary_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
             }
         }
         break;
@@ -232,7 +261,7 @@ nw_error_t *buffer_unary(unary_operation_type_t unary_operation_type, buffer_t *
                                + i * (*y_buffer)->view->strides[0]
                                + j * (*y_buffer)->view->strides[1]
                                + k * (*y_buffer)->view->strides[2];
-                    runtime_unary(unary_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+                    runtime_unary(unary_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
                 }
             }
         }
@@ -259,7 +288,7 @@ nw_error_t *buffer_unary(unary_operation_type_t unary_operation_type, buffer_t *
                                    + j * (*y_buffer)->view->strides[1]
                                    + k * (*y_buffer)->view->strides[2]
                                    + l * (*y_buffer)->view->strides[3];
-                        runtime_unary(unary_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+                        runtime_unary(unary_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
                     }
                 }
             }
@@ -282,195 +311,11 @@ cleanup:
     return error;
 }
 
-static nw_error_t *buffer_matrix_multiplication(buffer_t *x_buffer, buffer_t *y_buffer, buffer_t **z_buffer)
+nw_error_t *buffer_binary_before(binary_operation_type_t operation_type, buffer_t *x_buffer, buffer_t *y_buffer, buffer_t **z_buffer)
 {
-    CHECK_NULL_ARGUMENT(x_buffer, "x_buffer");
-    CHECK_NULL_ARGUMENT(y_buffer, "y_buffer");
-    CHECK_NULL_ARGUMENT(z_buffer, "z_buffer");
-    CHECK_NULL_ARGUMENT(x_buffer->view, "x_buffer->view");
-    CHECK_NULL_ARGUMENT(y_buffer->view, "y_buffer->view");
-    CHECK_NULL_ARGUMENT(x_buffer->view->strides, "x_buffer->view->strides");
-    CHECK_NULL_ARGUMENT(y_buffer->view->strides, "y_buffer->view->strides");
-    CHECK_NULL_ARGUMENT(x_buffer->view->shape, "x_buffer->view->shape");
-    CHECK_NULL_ARGUMENT(y_buffer->view->shape, "y_buffer->view->shape");
-    CHECK_NULL_ARGUMENT(x_buffer->storage, "x_buffer->storage");
-    CHECK_NULL_ARGUMENT(y_buffer->storage, "y_buffer->storage");
-    CHECK_NULL_ARGUMENT(x_buffer->storage->data, "x_buffer->storage->data");
-    CHECK_NULL_ARGUMENT(y_buffer->storage->data, "y_buffer->storage->data");
-
     nw_error_t *error = NULL;
     bool_t overwrite = (bool_t) *z_buffer;
     view_t *view = NULL;
-    runtime_t runtime;
-    datatype_t datatype;
-
-    if (x_buffer->storage->datatype != y_buffer->storage->datatype)
-    {
-        error = ERROR(ERROR_DATATYPE, string_create("datatypes are incompatible."), NULL);
-        goto cleanup;
-    }
-    else
-    {
-        datatype = x_buffer->storage->datatype;
-    }
-
-    if (x_buffer->storage->runtime != y_buffer->storage->runtime)
-    {
-        error = ERROR(ERROR_RUNTIME, string_create("runtimes are incompatible."), NULL);
-        goto cleanup;
-    }
-    else
-    {
-        runtime = x_buffer->storage->runtime;
-    }
-
-    if (!overwrite)
-    {
-        error = view_matrix_multiplication(x_buffer->view, y_buffer->view, &view);
-        if (error)
-        {
-            error = ERROR(ERROR_SHAPE, string_create("incompatible shapes for matrix multiplication."), error);
-            goto cleanup;
-        }
-
-        error = buffer_creation(EMPTY_OPERATION, z_buffer, view->shape, view->rank,
-                                view->strides, view->offset, runtime, datatype, NULL, 0, NULL);
-        if (error)
-        {
-            error = ERROR(ERROR_CREATE, string_create("failed to create buffer."), error);
-            goto cleanup;
-        }
-    }
-
-    void *x_data = x_buffer->storage->data;
-    void *y_data = y_buffer->storage->data;
-    void *z_data = (*z_buffer)->storage->data;
-    int64_t m = x_buffer->view->shape[x_buffer->view->rank - 2];
-    int64_t k = x_buffer->view->shape[x_buffer->view->rank - 1];
-    int64_t n = y_buffer->view->shape[y_buffer->view->rank - 1];
-    bool_t x_transpose = false; 
-    bool_t y_transpose = false;  
-    int64_t x_offset;
-    int64_t y_offset;
-    int64_t z_offset;
-
-    switch ((*z_buffer)->view->rank)
-    {
-    case 2:
-        x_offset = x_buffer->view->offset;
-        y_offset = y_buffer->view->offset;
-        z_offset = (*z_buffer)->view->offset;
-        runtime_matrix_multiplication(runtime, datatype, m, k, n,
-                                      x_transpose, y_transpose, 
-                                      x_data, x_offset, 
-                                      y_data, y_offset,
-                                      z_data, z_offset);
-        break;
-    case 3:
-        for (int64_t i = 0; i < (*z_buffer)->view->shape[0]; ++i)
-        {
-            x_offset = x_buffer->view->offset
-                       + i * x_buffer->view->strides[0];
-            y_offset = y_buffer->view->offset
-                       + i * y_buffer->view->strides[0];
-            z_offset = (*z_buffer)->view->offset
-                       + i * (*z_buffer)->view->strides[0];
-            runtime_matrix_multiplication(runtime, datatype, m, k, n,
-                                          x_transpose, y_transpose, 
-                                          x_data, x_offset, 
-                                          y_data, y_offset,
-                                          z_data, z_offset);
-        }
-        break;
-    case 4:
-        for (int64_t i = 0; i < (*z_buffer)->view->shape[0]; ++i)
-        {
-            for (int64_t j = 0; j < (*z_buffer)->view->shape[1]; ++j)
-            {
-                x_offset = x_buffer->view->offset
-                           + i * x_buffer->view->strides[0]
-                           + j * x_buffer->view->strides[1];
-                y_offset = y_buffer->view->offset
-                           + i * y_buffer->view->strides[0]
-                           + j * y_buffer->view->strides[1];
-                z_offset = (*z_buffer)->view->offset
-                           + i * (*z_buffer)->view->strides[0]
-                           + j * (*z_buffer)->view->strides[1];
-                runtime_matrix_multiplication(runtime, datatype, m, k, n,
-                                              x_transpose, y_transpose, 
-                                              x_data, x_offset, 
-                                              y_data, y_offset,
-                                              z_data, z_offset);
-            }
-        }
-        break;
-    case 5:
-        for (int64_t i = 0; i < (*z_buffer)->view->shape[0]; ++i)
-        {
-            for (int64_t j = 0; j < (*z_buffer)->view->shape[1]; ++j)
-            {
-                for (int64_t l = 0; l < (*z_buffer)->view->shape[2]; ++l)
-                {
-                    x_offset = x_buffer->view->offset
-                               + i * x_buffer->view->strides[0]
-                               + j * x_buffer->view->strides[1]
-                               + l * x_buffer->view->strides[2];
-                    y_offset = y_buffer->view->offset
-                               + i * y_buffer->view->strides[0]
-                               + j * y_buffer->view->strides[1]
-                               + l * y_buffer->view->strides[2];
-                    z_offset = (*z_buffer)->view->offset
-                               + i * (*z_buffer)->view->strides[0]
-                               + j * (*z_buffer)->view->strides[1]
-                               + l * (*z_buffer)->view->strides[2];
-                    runtime_matrix_multiplication(runtime, datatype, m, k, n,
-                                                  x_transpose, y_transpose, 
-                                                  x_data, x_offset, 
-                                                  y_data, y_offset,
-                                                  z_data, z_offset);
-                }
-            }
-        }
-        break;
-    default:
-        error = ERROR(ERROR_RANK, string_create("unsupported rank %d", (int) (*z_buffer)->view->rank), NULL);
-        goto cleanup;
-    }
-
-    view_destroy(view);
-
-    return error;
-
-cleanup:
-
-    if (!overwrite)
-    {
-        buffer_destroy(*z_buffer);
-    }
-
-    view_destroy(view);
-
-    return error;
-}
-
-static nw_error_t *buffer_binary_elementwise(binary_operation_type_t binary_operation_type, buffer_t *x_buffer, buffer_t *y_buffer, buffer_t **z_buffer)
-{
-    CHECK_NULL_ARGUMENT(x_buffer, "x_buffer");
-    CHECK_NULL_ARGUMENT(y_buffer, "y_buffer");
-    CHECK_NULL_ARGUMENT(z_buffer, "z_buffer");
-    CHECK_NULL_ARGUMENT(x_buffer->view, "x_buffer->view");
-    CHECK_NULL_ARGUMENT(y_buffer->view, "y_buffer->view");
-    CHECK_NULL_ARGUMENT(x_buffer->view->strides, "x_buffer->view->strides");
-    CHECK_NULL_ARGUMENT(y_buffer->view->strides, "y_buffer->view->strides");
-    CHECK_NULL_ARGUMENT(x_buffer->view->shape, "x_buffer->view->shape");
-    CHECK_NULL_ARGUMENT(y_buffer->view->shape, "y_buffer->view->shape");
-    CHECK_NULL_ARGUMENT(x_buffer->storage, "x_buffer->storage");
-    CHECK_NULL_ARGUMENT(y_buffer->storage, "y_buffer->storage");
-    CHECK_NULL_ARGUMENT(x_buffer->storage->data, "x_buffer->storage->data");
-    CHECK_NULL_ARGUMENT(y_buffer->storage->data, "y_buffer->storage->data");
-
-    nw_error_t *error = NULL;
-    bool_t overwrite = (bool_t) *z_buffer;
     int64_t rank = MAX(x_buffer->view->rank, y_buffer->view->rank);
     int64_t shape[rank];
     runtime_t runtime;
@@ -498,23 +343,219 @@ static nw_error_t *buffer_binary_elementwise(binary_operation_type_t binary_oper
 
     if (!overwrite)
     {
-        if (!view_shapes_equal(x_buffer->view, y_buffer->view))
+        if (operation_type == MATRIX_MULTIPLICATION_OPERATION)
         {
-            error = ERROR(ERROR_SHAPE, string_create("incompatible tensor shapes."), NULL);
-            goto cleanup;
-        }
-        else
-        {
-            memcpy(shape, x_buffer->view->shape, rank * sizeof(int64_t));
-        }
+            error = view_matrix_multiplication(x_buffer->view, y_buffer->view, &view);
+            if (error)
+            {
+                error = ERROR(ERROR_SHAPE, string_create("incompatible shapes for matrix multiplication."), error);
+                goto cleanup;
+            }
 
-        error = buffer_creation(EMPTY_OPERATION, z_buffer, shape, rank, NULL, 0, runtime, datatype, NULL, 0, NULL);
-        if (error)
-        {
-            error = ERROR(ERROR_CREATE, string_create("failed to create buffer."), error);
-            goto cleanup;
+            error = buffer_creation(EMPTY_OPERATION, z_buffer, view->shape, view->rank,
+                                    view->strides, view->offset, runtime, datatype, NULL, 0, NULL);
+            if (error)
+            {
+                error = ERROR(ERROR_CREATE, string_create("failed to create buffer."), error);
+                goto cleanup;
+            }
+
+        } else {
+            if (!view_shapes_equal(x_buffer->view, y_buffer->view))
+            {
+                error = ERROR(ERROR_SHAPE, string_create("incompatible tensor shapes."), NULL);
+                goto cleanup;
+            }
+            else
+            {
+                memcpy(shape, x_buffer->view->shape, rank * sizeof(int64_t));
+            }
+
+            error = buffer_creation(EMPTY_OPERATION, z_buffer, shape, rank, NULL, 0, runtime, datatype, NULL, 0, NULL);
+            if (error)
+            {
+                error = ERROR(ERROR_CREATE, string_create("failed to create buffer."), error);
+                goto cleanup;
+            }
         }
     }
+
+    if (view != NULL)
+    {
+        view_destroy(view);
+    }
+
+    return error;
+
+cleanup:
+
+    if (!overwrite)
+    {
+        buffer_destroy(*z_buffer);
+    }
+
+    if (view != NULL)
+    {
+        view_destroy(view);
+    }
+
+    return error;
+}
+
+static nw_error_t *buffer_matrix_multiplication(buffer_t *x_buffer, buffer_t *y_buffer, buffer_t **z_buffer, int stream_id)
+{
+    CHECK_NULL_ARGUMENT(x_buffer, "x_buffer");
+    CHECK_NULL_ARGUMENT(y_buffer, "y_buffer");
+    CHECK_NULL_ARGUMENT(z_buffer, "z_buffer");
+    CHECK_NULL_ARGUMENT(x_buffer->view, "x_buffer->view");
+    CHECK_NULL_ARGUMENT(y_buffer->view, "y_buffer->view");
+    CHECK_NULL_ARGUMENT(x_buffer->view->strides, "x_buffer->view->strides");
+    CHECK_NULL_ARGUMENT(y_buffer->view->strides, "y_buffer->view->strides");
+    CHECK_NULL_ARGUMENT(x_buffer->view->shape, "x_buffer->view->shape");
+    CHECK_NULL_ARGUMENT(y_buffer->view->shape, "y_buffer->view->shape");
+    CHECK_NULL_ARGUMENT(x_buffer->storage, "x_buffer->storage");
+    CHECK_NULL_ARGUMENT(y_buffer->storage, "y_buffer->storage");
+    CHECK_NULL_ARGUMENT(x_buffer->storage->data, "x_buffer->storage->data");
+    CHECK_NULL_ARGUMENT(y_buffer->storage->data, "y_buffer->storage->data");
+
+    nw_error_t *error = NULL;
+    bool_t overwrite = (bool_t) *z_buffer;
+    runtime_t runtime;
+    datatype_t datatype;
+
+    void *x_data = x_buffer->storage->data;
+    void *y_data = y_buffer->storage->data;
+    void *z_data = (*z_buffer)->storage->data;
+    int64_t m = x_buffer->view->shape[x_buffer->view->rank - 2];
+    int64_t k = x_buffer->view->shape[x_buffer->view->rank - 1];
+    int64_t n = y_buffer->view->shape[y_buffer->view->rank - 1];
+    bool_t x_transpose = false; 
+    bool_t y_transpose = false;  
+    int64_t x_offset;
+    int64_t y_offset;
+    int64_t z_offset;
+
+    switch ((*z_buffer)->view->rank)
+    {
+    case 2:
+        x_offset = x_buffer->view->offset;
+        y_offset = y_buffer->view->offset;
+        z_offset = (*z_buffer)->view->offset;
+        runtime_matrix_multiplication(runtime, datatype, m, k, n,
+                                      x_transpose, y_transpose, 
+                                      x_data, x_offset, 
+                                      y_data, y_offset,
+                                      z_data, z_offset,
+                                      stream_id);
+        break;
+    case 3:
+        for (int64_t i = 0; i < (*z_buffer)->view->shape[0]; ++i)
+        {
+            x_offset = x_buffer->view->offset
+                       + i * x_buffer->view->strides[0];
+            y_offset = y_buffer->view->offset
+                       + i * y_buffer->view->strides[0];
+            z_offset = (*z_buffer)->view->offset
+                       + i * (*z_buffer)->view->strides[0];
+            runtime_matrix_multiplication(runtime, datatype, m, k, n,
+                                          x_transpose, y_transpose, 
+                                          x_data, x_offset, 
+                                          y_data, y_offset,
+                                          z_data, z_offset,
+                                          stream_id);
+        }
+        break;
+    case 4:
+        for (int64_t i = 0; i < (*z_buffer)->view->shape[0]; ++i)
+        {
+            for (int64_t j = 0; j < (*z_buffer)->view->shape[1]; ++j)
+            {
+                x_offset = x_buffer->view->offset
+                           + i * x_buffer->view->strides[0]
+                           + j * x_buffer->view->strides[1];
+                y_offset = y_buffer->view->offset
+                           + i * y_buffer->view->strides[0]
+                           + j * y_buffer->view->strides[1];
+                z_offset = (*z_buffer)->view->offset
+                           + i * (*z_buffer)->view->strides[0]
+                           + j * (*z_buffer)->view->strides[1];
+                runtime_matrix_multiplication(runtime, datatype, m, k, n,
+                                              x_transpose, y_transpose, 
+                                              x_data, x_offset, 
+                                              y_data, y_offset,
+                                              z_data, z_offset,
+                                              stream_id);
+            }
+        }
+        break;
+    case 5:
+        for (int64_t i = 0; i < (*z_buffer)->view->shape[0]; ++i)
+        {
+            for (int64_t j = 0; j < (*z_buffer)->view->shape[1]; ++j)
+            {
+                for (int64_t l = 0; l < (*z_buffer)->view->shape[2]; ++l)
+                {
+                    x_offset = x_buffer->view->offset
+                               + i * x_buffer->view->strides[0]
+                               + j * x_buffer->view->strides[1]
+                               + l * x_buffer->view->strides[2];
+                    y_offset = y_buffer->view->offset
+                               + i * y_buffer->view->strides[0]
+                               + j * y_buffer->view->strides[1]
+                               + l * y_buffer->view->strides[2];
+                    z_offset = (*z_buffer)->view->offset
+                               + i * (*z_buffer)->view->strides[0]
+                               + j * (*z_buffer)->view->strides[1]
+                               + l * (*z_buffer)->view->strides[2];
+                    runtime_matrix_multiplication(runtime, datatype, m, k, n,
+                                                  x_transpose, y_transpose, 
+                                                  x_data, x_offset, 
+                                                  y_data, y_offset,
+                                                  z_data, z_offset,
+                                                  stream_id);
+                }
+            }
+        }
+        break;
+    default:
+        error = ERROR(ERROR_RANK, string_create("unsupported rank %d", (int) (*z_buffer)->view->rank), NULL);
+        goto cleanup;
+    }
+
+    return error;
+
+cleanup:
+
+    if (!overwrite)
+    {
+        buffer_destroy(*z_buffer);
+    }
+
+    return error;
+}
+
+static nw_error_t *buffer_binary_elementwise(binary_operation_type_t binary_operation_type, buffer_t *x_buffer, buffer_t *y_buffer, buffer_t **z_buffer, int stream_id)
+{
+    CHECK_NULL_ARGUMENT(x_buffer, "x_buffer");
+    CHECK_NULL_ARGUMENT(y_buffer, "y_buffer");
+    CHECK_NULL_ARGUMENT(z_buffer, "z_buffer");
+    CHECK_NULL_ARGUMENT(x_buffer->view, "x_buffer->view");
+    CHECK_NULL_ARGUMENT(y_buffer->view, "y_buffer->view");
+    CHECK_NULL_ARGUMENT(x_buffer->view->strides, "x_buffer->view->strides");
+    CHECK_NULL_ARGUMENT(y_buffer->view->strides, "y_buffer->view->strides");
+    CHECK_NULL_ARGUMENT(x_buffer->view->shape, "x_buffer->view->shape");
+    CHECK_NULL_ARGUMENT(y_buffer->view->shape, "y_buffer->view->shape");
+    CHECK_NULL_ARGUMENT(x_buffer->storage, "x_buffer->storage");
+    CHECK_NULL_ARGUMENT(y_buffer->storage, "y_buffer->storage");
+    CHECK_NULL_ARGUMENT(x_buffer->storage->data, "x_buffer->storage->data");
+    CHECK_NULL_ARGUMENT(y_buffer->storage->data, "y_buffer->storage->data");
+
+    nw_error_t *error = NULL;
+    bool_t overwrite = (bool_t) *z_buffer;
+    int64_t rank = MAX(x_buffer->view->rank, y_buffer->view->rank);
+    int64_t shape[rank];
+    runtime_t runtime;
+    datatype_t datatype;
 
     void *x_data = x_buffer->storage->data;
     void *y_data = y_buffer->storage->data;
@@ -542,7 +583,8 @@ static nw_error_t *buffer_binary_elementwise(binary_operation_type_t binary_oper
                                    runtime, datatype, n, 
                                    x_data, x_stride, x_offset, 
                                    y_data, y_stride, y_offset,
-                                   z_data, z_stride, z_offset);
+                                   z_data, z_stride, z_offset,
+                                   stream_id);
         break;
     case 1:
         n = (*z_buffer)->view->shape[0];
@@ -556,7 +598,8 @@ static nw_error_t *buffer_binary_elementwise(binary_operation_type_t binary_oper
                                    runtime, datatype, n, 
                                    x_data, x_stride, x_offset, 
                                    y_data, y_stride, y_offset,
-                                   z_data, z_stride, z_offset);
+                                   z_data, z_stride, z_offset,
+                                   stream_id);
         break;
     case 2:
         for (int64_t i = 0; i < (*z_buffer)->view->shape[0]; ++i)
@@ -575,7 +618,8 @@ static nw_error_t *buffer_binary_elementwise(binary_operation_type_t binary_oper
                                        runtime, datatype, n, 
                                        x_data, x_stride, x_offset, 
                                        y_data, y_stride, y_offset,
-                                       z_data, z_stride, z_offset);
+                                       z_data, z_stride, z_offset,
+                                       stream_id);
         }
         break;
     case 3:
@@ -601,7 +645,8 @@ static nw_error_t *buffer_binary_elementwise(binary_operation_type_t binary_oper
                                            runtime, datatype, n, 
                                            x_data, x_stride, x_offset, 
                                            y_data, y_stride, y_offset,
-                                           z_data, z_stride, z_offset);
+                                           z_data, z_stride, z_offset,
+                                           stream_id);
             }
         }
         break;
@@ -633,7 +678,8 @@ static nw_error_t *buffer_binary_elementwise(binary_operation_type_t binary_oper
                                                runtime, datatype, n, 
                                                x_data, x_stride, x_offset, 
                                                y_data, y_stride, y_offset,
-                                               z_data, z_stride, z_offset);
+                                               z_data, z_stride, z_offset,
+                                               stream_id);
                 }
             }
         }
@@ -671,7 +717,8 @@ static nw_error_t *buffer_binary_elementwise(binary_operation_type_t binary_oper
                                                    runtime, datatype, n, 
                                                    x_data, x_stride, x_offset, 
                                                    y_data, y_stride, y_offset,
-                                                   z_data, z_stride, z_offset);
+                                                   z_data, z_stride, z_offset,
+                                                   stream_id);
                     }
                 }
             }
@@ -694,7 +741,7 @@ cleanup:
     return error;
 }
 
-nw_error_t *buffer_binary(binary_operation_type_t operation_type, buffer_t *x_buffer, buffer_t *y_buffer, buffer_t **z_buffer)
+nw_error_t *buffer_binary(binary_operation_type_t operation_type, buffer_t *x_buffer, buffer_t *y_buffer, buffer_t **z_buffer, int stream_id)
 {
     nw_error_t *error = NULL;
 
@@ -707,10 +754,10 @@ nw_error_t *buffer_binary(binary_operation_type_t operation_type, buffer_t *x_bu
     case POWER_OPERATION:
     case COMPARE_EQUAL_OPERATION:
     case COMPARE_GREATER_OPERATION:
-        error = buffer_binary_elementwise(operation_type, x_buffer, y_buffer, z_buffer);
+        error = buffer_binary_elementwise(operation_type, x_buffer, y_buffer, z_buffer, stream_id);
         break;
     case MATRIX_MULTIPLICATION_OPERATION:
-        error = buffer_matrix_multiplication(x_buffer, y_buffer, z_buffer);
+        error = buffer_matrix_multiplication(x_buffer, y_buffer, z_buffer, stream_id);
         break;
     default:
         error = ERROR(ERROR_OPERATION_TYPE, string_create("unknown operation type %d.", (int) operation_type), NULL);
@@ -725,7 +772,7 @@ nw_error_t *buffer_binary(binary_operation_type_t operation_type, buffer_t *x_bu
     return error;
 }
 
-static nw_error_t *runtime_reduction_dimension(reduction_operation_type_t reduction_operation_type, buffer_t *x_buffer, buffer_t *y_buffer, int64_t axis, bool_t keep_dimension)
+static nw_error_t *runtime_reduction_dimension(reduction_operation_type_t reduction_operation_type, buffer_t *x_buffer, buffer_t *y_buffer, int64_t axis, bool_t keep_dimension, int stream_id)
 {
     CHECK_NULL_ARGUMENT(x_buffer, "x_buffer");
     CHECK_NULL_ARGUMENT(y_buffer, "y_buffer");
@@ -760,7 +807,7 @@ static nw_error_t *runtime_reduction_dimension(reduction_operation_type_t reduct
     case 1:
         x_offset = x_buffer->view->offset;
         y_offset = y_buffer->view->offset;
-        runtime_reduction(reduction_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_offset);
+        runtime_reduction(reduction_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_offset, stream_id);
         break;
     case 2:
         switch (axis)
@@ -781,7 +828,7 @@ static nw_error_t *runtime_reduction_dimension(reduction_operation_type_t reduct
                        + i * x_buffer->view->strides[idim];
             y_offset = y_buffer->view->offset
                        + i * y_buffer->view->strides[(idim >= axis && !keep_dimension) ? idim - 1 : idim];
-            runtime_reduction(reduction_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_offset);
+            runtime_reduction(reduction_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_offset, stream_id);
         }
         break;
     case 3:
@@ -813,7 +860,7 @@ static nw_error_t *runtime_reduction_dimension(reduction_operation_type_t reduct
                 y_offset = y_buffer->view->offset
                        + i * y_buffer->view->strides[(idim >= axis && !keep_dimension) ? idim - 1 : idim]
                        + j * y_buffer->view->strides[(jdim >= axis && !keep_dimension) ? jdim - 1 : jdim];
-                runtime_reduction(reduction_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_offset);
+                runtime_reduction(reduction_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_offset, stream_id);
             }
         }
 
@@ -859,7 +906,7 @@ static nw_error_t *runtime_reduction_dimension(reduction_operation_type_t reduct
                        + i * y_buffer->view->strides[(idim >= axis && !keep_dimension) ? idim - 1 : idim]
                        + j * y_buffer->view->strides[(jdim >= axis && !keep_dimension) ? jdim - 1 : jdim]
                        + k * y_buffer->view->strides[(kdim >= axis && !keep_dimension) ? kdim - 1 : kdim];
-                    runtime_reduction(reduction_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_offset);
+                    runtime_reduction(reduction_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_offset, stream_id);
                 }
             }
         }
@@ -919,7 +966,7 @@ static nw_error_t *runtime_reduction_dimension(reduction_operation_type_t reduct
                        + j * y_buffer->view->strides[(jdim >= axis && !keep_dimension) ? jdim - 1 : jdim]
                        + k * y_buffer->view->strides[(kdim >= axis && !keep_dimension) ? kdim - 1 : kdim]
                        + l * y_buffer->view->strides[(ldim >= axis && !keep_dimension) ? ldim - 1 : ldim];
-                        runtime_reduction(reduction_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_offset);
+                        runtime_reduction(reduction_operation_type, runtime, datatype, n, x_data, x_stride, x_offset, y_data, y_offset, stream_id);
                     }
                 }
             }
@@ -932,7 +979,7 @@ static nw_error_t *runtime_reduction_dimension(reduction_operation_type_t reduct
     return NULL;
 }
 
-nw_error_t *buffer_reduction(reduction_operation_type_t reduction_operation_type, buffer_t *x, int64_t *axis, int64_t length, buffer_t **result, bool_t keep_dimension)
+nw_error_t *buffer_reduction_before(reduction_operation_type_t reduction_operation_type, buffer_t *x, int64_t *axis, int64_t length, buffer_t **result, bool_t keep_dimension)
 {
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(x->view, "x->view");
@@ -943,11 +990,7 @@ nw_error_t *buffer_reduction(reduction_operation_type_t reduction_operation_type
 
     nw_error_t *error = NULL;
     bool_t overwrite = (bool_t) *result;
-    datatype_t datatype = x->storage->datatype;
-    runtime_t runtime = x->storage->runtime;
-    buffer_t *intermediate_buffer = NULL;
     view_t *reduced_view = NULL;
-    int64_t sorted_axis[length];
 
     if (!overwrite)
     {
@@ -968,6 +1011,39 @@ nw_error_t *buffer_reduction(reduction_operation_type_t reduction_operation_type
         view_destroy(reduced_view);
         reduced_view = NULL;
     }
+
+    view_destroy(reduced_view);
+
+    return error;
+
+cleanup:
+
+    if (!overwrite)
+    {
+        buffer_destroy(*result);
+    }
+
+    view_destroy(reduced_view);
+
+    return error;
+}
+
+nw_error_t *buffer_reduction(reduction_operation_type_t reduction_operation_type, buffer_t *x, int64_t *axis, int64_t length, buffer_t **result, bool_t keep_dimension, int stream_id)
+{
+    CHECK_NULL_ARGUMENT(x, "x");
+    CHECK_NULL_ARGUMENT(x->view, "x->view");
+    CHECK_NULL_ARGUMENT(x->storage, "x->storage");
+    CHECK_NULL_ARGUMENT(axis, "axis");
+    CHECK_NULL_ARGUMENT(result, "result");
+    CHECK_UNIQUE(axis, length, "axis");
+
+    nw_error_t *error = NULL;
+    bool_t overwrite = (bool_t) *result;
+    datatype_t datatype = x->storage->datatype;
+    runtime_t runtime = x->storage->runtime;
+    buffer_t *intermediate_buffer = NULL;
+    view_t *reduced_view = NULL;
+    int64_t sorted_axis[length];
 
     error = descending_sort(axis, length, sorted_axis);
     if (error)
@@ -1000,7 +1076,7 @@ nw_error_t *buffer_reduction(reduction_operation_type_t reduction_operation_type
             intermediate_buffer = *result;
         }
 
-        error = runtime_reduction_dimension(reduction_operation_type, x, intermediate_buffer, sorted_axis[i], keep_dimension);
+        error = runtime_reduction_dimension(reduction_operation_type, x, intermediate_buffer, sorted_axis[i], keep_dimension, stream_id);
         if (error)
         {
             error = ERROR(ERROR_REDUCTION, string_create("failed to reduce tensor dimension."), error);
@@ -1046,7 +1122,7 @@ static void runtime_padding(const buffer_t *x, buffer_t *y, int64_t *arguments, 
 
     for (int64_t i  = 0; i < y->view->shape[index]; ++i)
     {
-        int64_t offset_i = i - arguments[2 * index]; 
+        int64_t offset_i = i - arguments[2 * index];
         bool_t in_bounds_i = in_bounds && offset_i >= 0 && offset_i < x->view->shape[index];
         int64_t x_offset_i = x_offset + offset_i * x->view->strides[index];
         int64_t y_offset_i = y_offset + i * y->view->strides[index];
@@ -1071,7 +1147,7 @@ static void runtime_padding(const buffer_t *x, buffer_t *y, int64_t *arguments, 
     }
 }
 
-nw_error_t *buffer_structure(structure_operation_type_t structure_operation_type, buffer_t *x, int64_t *arguments, int64_t length, buffer_t **result)
+nw_error_t *buffer_structure_before(structure_operation_type_t structure_operation_type, buffer_t *x, int64_t *arguments, int64_t length, buffer_t **result)
 {
     nw_error_t *error = NULL;
     view_t *view = NULL;
@@ -1124,8 +1200,7 @@ nw_error_t *buffer_structure(structure_operation_type_t structure_operation_type
             return ERROR(ERROR_CREATE, string_create("failed to create buffer."), error);
         }
 
-        runtime_padding(x, *result, arguments, length, 0, true, x->view->offset, (*result)->view->offset);
-
+        // TODO: Check if sigsegv
         view_destroy(view);
 
         return error;
@@ -1153,8 +1228,7 @@ nw_error_t *buffer_structure(structure_operation_type_t structure_operation_type
         {
             return ERROR(ERROR_CREATE, string_create("failed to create buffer."), error);
         }
-        runtime_image_to_column(datatype, x->storage->data, batch_size, channels, height, width, kernel_size, 
-                                output_height, output_width, stride, padding, (*result)->storage->data, !im2col);
+
         return error;
     }
 
@@ -1162,6 +1236,43 @@ nw_error_t *buffer_structure(structure_operation_type_t structure_operation_type
     if (error)
     {
         return ERROR(ERROR_CREATE, string_create("failed to create buffer."), error);
+    }
+
+    return error;
+}
+
+nw_error_t *buffer_structure(structure_operation_type_t structure_operation_type, buffer_t *x, int64_t *arguments, int64_t length, buffer_t **result, int stream_id)
+{
+    nw_error_t *error = NULL;
+    view_t *view = NULL;
+
+    if (structure_operation_type == PADDING_OPERATION)
+    {
+        runtime_synchronize(x->storage->runtime, stream_id);
+
+        runtime_padding(x, *result, arguments, length, 0, true, x->view->offset, (*result)->view->offset);
+
+        view_destroy(view);
+    }
+    else if (structure_operation_type == IMAGE_TO_COLUMN_OPERATION || structure_operation_type == COLUMN_TO_IMAGE_OPERATION)
+    {
+        int64_t batch_size = x->view->shape[0];
+        int64_t kernel_size = arguments[0];
+        int64_t stride = arguments[1];
+        int64_t padding = arguments[2];
+        int64_t channels = arguments[3];
+        int64_t height = arguments[4];
+        int64_t width = arguments[5];
+        int64_t output_height = (height + 2 * padding - kernel_size) / stride + 1;
+        int64_t output_width = (width + 2 * padding - kernel_size) / stride + 1;
+        runtime_t runtime = x->storage->runtime;
+        datatype_t datatype = x->storage->datatype;
+        bool_t im2col = structure_operation_type == IMAGE_TO_COLUMN_OPERATION;
+
+        runtime_synchronize(runtime, stream_id);
+
+        runtime_image_to_column(datatype, x->storage->data, batch_size, channels, height, width, kernel_size, 
+                                output_height, output_width, stride, padding, (*result)->storage->data, !im2col);
     }
 
     return error;
