@@ -4,7 +4,7 @@
  */
 
 #include <tensor.h>
-#include <deque.h>
+#include <stack.h>
 #include <map.h>
 #include <function.h>
 #include <buffer.h>
@@ -2010,14 +2010,14 @@ nw_error_t *tensor_rectified_linear(const tensor_t *x, tensor_t **y)
     return error;
 }
 
-/**Construct the deque of tensors used in the forward pass of the provided
+/**Construct the stack of tensors used in the forward pass of the provided
  * tensor.
  *
  * @param tensor[in] the parent tensor.
  * @param visited[out] the map of visited tensor ids.
- * @param tensors[out] the resulting deque of visited tensors.
+ * @param tensors[out] the resulting stack of visited tensors.
  */
-static nw_error_t *topological_sort(tensor_t *tensor, map_t *visited, deque_t *tensors)
+static nw_error_t *topological_sort(tensor_t *tensor, map_t *visited, stack_t *tensors)
 {
     PRINTLN_DEBUG_LOCATION("input");
     PRINTLN_DEBUG_TENSOR("tensor", tensor);
@@ -2031,7 +2031,17 @@ static nw_error_t *topological_sort(tensor_t *tensor, map_t *visited, deque_t *t
     string_t id = string_create("%lu", tensor->id);
     function_t *context = tensor->context;
 
-    // TODO: check if backward still works with map moved around
+    if (map_contains(visited, id))
+    {
+        goto cleanup;
+    }
+
+    error = map_set(visited, id, NULL);
+    if (error)
+    {
+        error = ERROR(ERROR_SET, string_create("failed set tensor in map."), error);
+        goto cleanup;
+    }
 
     if (context)
     {
@@ -2099,22 +2109,10 @@ static nw_error_t *topological_sort(tensor_t *tensor, map_t *visited, deque_t *t
         }
     }
 
-    if (map_contains(visited, id))
-    {
-        goto cleanup;
-    }
-
-    error = map_set(visited, id, NULL);
+    error = stack_push(tensors, tensor);
     if (error)
     {
-        error = ERROR(ERROR_SET, string_create("failed set tensor in map."), error);
-        goto cleanup;
-    }
-
-    error = deque_push_front(tensors, tensor);
-    if (error)
-    {
-        error = ERROR(ERROR_PUSH, string_create("failed to push tensor to deque."), error);
+        error = ERROR(ERROR_PUSH, string_create("failed to push tensor to stack."), error);
         goto cleanup;
     }
 
@@ -2127,23 +2125,30 @@ cleanup:
     return error;
 }
 
-/**Construct the deque of tensors used in the forward pass of the provided
- * tensor.
+/**Schedule tensor operations.
  *
  * @param tensor[in] the parent tensor.
  * @param visited[out] the map of visited tensor ids.
- * @param tensors[out] the resulting deque of visited tensors.
  */
-static nw_error_t *tensor_schedule(tensor_t *tensor, int stream_id)
+static nw_error_t *tensor_schedule(tensor_t *tensor, map_t *visited, int stream_id)
 {
-    PRINTLN_DEBUG_LOCATION("input");
-    PRINTLN_DEBUG_TENSOR("tensor", tensor);
-    PRINT_DEBUG_NEWLINE;
-
     CHECK_NULL_ARGUMENT(tensor, "tensor");
+    CHECK_NULL_ARGUMENT(visited, "visited");
 
     nw_error_t *error = NULL;
     function_t *context = tensor->context;
+
+    if (map_contains(visited, id))
+    {
+        goto cleanup;
+    }
+
+    error = map_set(visited, id, NULL);
+    if (error)
+    {
+        error = ERROR(ERROR_SET, string_create("failed set tensor in map."), error);
+        goto cleanup;
+    }
 
     if (context)
     {
@@ -2211,10 +2216,13 @@ static nw_error_t *tensor_schedule(tensor_t *tensor, int stream_id)
             error = ERROR(ERROR_FORWARD, string_create("failed to evaluate forward pass for tensor."), error);
         }
 
-        error = function_forward(context, &tensor, stream_id);
-        if (error != NULL)
+        if (operation_type != STRUCTURE_OPERATION)
         {
-            error = ERROR(ERROR_FORWARD, string_create("failed to evaluate forward pass for tensor."), error);
+            error = function_forward(context, &tensor, stream_id);
+            if (error != NULL)
+            {
+                error = ERROR(ERROR_FORWARD, string_create("failed to evaluate forward pass for tensor."), error);
+            }
         }
     }
 
@@ -2689,10 +2697,18 @@ nw_error_t *tensor_evaluate(tensor_t *x)
     CHECK_NULL_ARGUMENT(x->buffer->view, "x->buffer->view");
 
     nw_error_t *error = NULL;
+    map_t *visited = NULL;
+
+    error = map_create(&visited);
+    if (error)
+    {
+        error = ERROR(ERROR_CREATE, string_create("failed to create map."), error);
+        goto cleanup;
+    }
 
     it (!no_lazy_eval)
     {
-        error = tensor_schedule(x, 0);
+        error = tensor_schedule(x, visited, 0);
         if (error != NULL)
         {
             error = ERROR(ERROR_FORWARD, string_create("failed to evaluate forward pass for tensor."), error);
@@ -2723,7 +2739,7 @@ nw_error_t *tensor_backward(tensor_t *x, tensor_t *gradient)
 
     with_no_gradient(true);
     nw_error_t *error = NULL;
-    deque_t *tensors = NULL;
+    stack_t *tensors = NULL;
     map_t *visited = NULL;
     tensor_t *y = NULL;
 
@@ -2741,10 +2757,10 @@ nw_error_t *tensor_backward(tensor_t *x, tensor_t *gradient)
         }
     }
 
-    error = deque_create(&tensors);
+    error = stack_create(&tensors);
     if (error)
     {
-        error = ERROR(ERROR_CREATE, string_create("failed to create deque."), error);
+        error = ERROR(ERROR_CREATE, string_create("failed to create stack."), error);
         goto cleanup;
     }
 
@@ -2764,10 +2780,10 @@ nw_error_t *tensor_backward(tensor_t *x, tensor_t *gradient)
 
     while (tensors->size > 0)
     {
-        error = deque_pop_front(tensors, (void **) &y);
+        error = stack_pop(tensors, (void **) &y);
         if (error)
         {
-            error = ERROR(ERROR_POP, string_create("failed to pop tensor from deque"), error);
+            error = ERROR(ERROR_POP, string_create("failed to pop tensor from stack"), error);
             goto cleanup;
         }
 
@@ -2791,7 +2807,7 @@ nw_error_t *tensor_backward(tensor_t *x, tensor_t *gradient)
 cleanup:
 
     map_destroy(visited);
-    deque_destroy(tensors);
+    stack_destroy(tensors);
     with_no_gradient(false);
     
     return error;

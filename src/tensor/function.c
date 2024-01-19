@@ -174,7 +174,7 @@ static nw_error_t *apply_function(operation_type_t operation_type, void *type_op
 
     if ((operation_type == CREATION_OPERATION) || no_lazy_eval)
     {
-        // Run forward pass with one stream.
+        // Run forward pass immediately.
         function_forward(function, result, 0);
     }
 

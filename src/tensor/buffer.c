@@ -75,11 +75,10 @@ nw_error_t *storage_synchronize(storage_t *storage, int stream_id)
     return NULL;
 }
 
-nw_error_t *buffer_create(buffer_t **buffer, view_t *view, storage_t *storage, bool_t copy)
+nw_error_t *buffer_create(buffer_t **buffer, view_t *view)
 {
     CHECK_NULL_ARGUMENT(buffer, "buffer");
     CHECK_NULL_ARGUMENT(view, "view");
-    CHECK_NULL_ARGUMENT(storage, "storage");
 
     nw_error_t *error = NULL;
 
@@ -90,6 +89,13 @@ nw_error_t *buffer_create(buffer_t **buffer, view_t *view, storage_t *storage, b
     }
 
     (*buffer)->view = view;
+
+    return NULL;
+}
+
+nw_error_t buffer_set_storage(storage_t *storage, bool_t copy)
+{
+    CHECK_NULL_ARGUMENT(storage, "storage");
 
     if (copy)
     {
@@ -1310,7 +1316,7 @@ static nw_error_t *buffer_create_empty(buffer_t **buffer, const int64_t *shape, 
         goto cleanup;
     }
 
-    error = buffer_create(buffer, view, storage, false);
+    error = buffer_set_storage(storage, false);
     if (error)
     {
         error = ERROR(ERROR_CREATE, string_create("failed to create buffer."), error);
@@ -1321,7 +1327,6 @@ static nw_error_t *buffer_create_empty(buffer_t **buffer, const int64_t *shape, 
 
 cleanup:
 
-    view_destroy(view);
     storage_destroy(storage);
 
     return error;
@@ -1331,10 +1336,10 @@ static nw_error_t *buffer_create_nonempty(buffer_t **buffer, const int64_t *shap
                                           int64_t offset, runtime_t runtime, datatype_t datatype, void *data, bool_t copy)
 {
     CHECK_NULL_ARGUMENT(buffer, "buffer");
-    CHECK_NULL_ARGUMENT(shape, "shape");
+    CHECK_NULL_ARGUMENT(buffer->view, "buffer->view");
 
     nw_error_t *error = NULL;
-    view_t *view = NULL;
+    view_t *view = buffer->view;
     storage_t *storage = NULL;
     int64_t n = 0;
 
@@ -1359,7 +1364,7 @@ static nw_error_t *buffer_create_nonempty(buffer_t **buffer, const int64_t *shap
         goto cleanup;
     }
 
-    error = buffer_create(buffer, view, storage, false);
+    error = buffer_set_storage(storage, false);
     if (error)
     {
         error = ERROR(ERROR_CREATE, string_create("failed to create buffer."), error);
@@ -1370,7 +1375,6 @@ static nw_error_t *buffer_create_nonempty(buffer_t **buffer, const int64_t *shap
 
 cleanup:
 
-    view_destroy(view);
     storage_destroy(storage);
 
     return error;
@@ -1380,7 +1384,6 @@ static nw_error_t *buffer_create_init(buffer_t **buffer, creation_operation_type
                                       const int64_t *strides, int64_t offset, runtime_t runtime, datatype_t datatype, void **arguments, int64_t length)
 {
     CHECK_NULL_ARGUMENT(buffer, "buffer");
-    CHECK_NULL_ARGUMENT(shape, "shape");
     if (length)
     {
         CHECK_NULL_ARGUMENT(arguments, "arguments");
