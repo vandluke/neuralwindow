@@ -1604,6 +1604,7 @@ cleanup:
 static nw_error_t *as_operation_forward(tensor_t *x, tensor_t *result)
 {
     CHECK_NULL_ARGUMENT(x, "x");
+    CHECK_NULL_ARGUMENT(x->buffer, "x->buffer");
     CHECK_NULL_ARGUMENT(result, "result");
 
     nw_error_t *error = NULL;

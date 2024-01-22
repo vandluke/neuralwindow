@@ -93,8 +93,10 @@ nw_error_t *buffer_create(buffer_t **buffer, view_t *view)
     return NULL;
 }
 
-nw_error_t buffer_set_storage(storage_t *storage, bool_t copy)
+nw_error_t buffer_set_storage(buffer_t **buffer, storage_t *storage, bool_t copy)
 {
+    CHECK_NULL_ARGUMENT(buffer, "buffer");
+    CHECK_NULL_ARGUMENT(*buffer, "*buffer");
     CHECK_NULL_ARGUMENT(storage, "storage");
 
     if (copy)
@@ -1316,10 +1318,10 @@ static nw_error_t *buffer_create_empty(buffer_t **buffer, const int64_t *shape, 
         goto cleanup;
     }
 
-    error = buffer_set_storage(storage, false);
+    error = buffer_set_storage(buffer, storage, false);
     if (error)
     {
-        error = ERROR(ERROR_CREATE, string_create("failed to create buffer."), error);
+        error = ERROR(ERROR_CREATE, string_create("failed to assign buffer backing memory."), error);
         goto cleanup;
     }
 
@@ -1364,10 +1366,10 @@ static nw_error_t *buffer_create_nonempty(buffer_t **buffer, const int64_t *shap
         goto cleanup;
     }
 
-    error = buffer_set_storage(storage, false);
+    error = buffer_set_storage(buffer, storage, false);
     if (error)
     {
-        error = ERROR(ERROR_CREATE, string_create("failed to create buffer."), error);
+        error = ERROR(ERROR_CREATE, string_create("failed to assign buffer backing memory."), error);
         goto cleanup;
     }
 
