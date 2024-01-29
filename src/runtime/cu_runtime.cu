@@ -62,7 +62,7 @@ extern "C" nw_error_t *cu_create_context(void)
     for (int i = 0; i < NW_NUM_STREAMS; ++i)
     {
         cudaStreamCreate(&cuda_stream[i]);
-        magma_queue_create_from_cuda(&m_device[i], &cuda_stream[i], cublas_handle, cusparse_handle, &m_queue);
+        magma_queue_create_from_cuda(m_device, cuda_stream[i], cublas_handle, cusparse_handle, &m_queue[i]);
     }
 
     num_mp = magma_getdevice_multiprocessor_count();
@@ -78,8 +78,8 @@ extern "C" void cu_destroy_context(void)
 
     for (int i = 0; i < NW_NUM_STREAMS; ++i)
     {
-        cudaStreamDestroy(&cuda_stream[i]);
-        magma_queue_destroy(&m_queue[i]);
+        cudaStreamDestroy(cuda_stream[i]);
+        magma_queue_destroy(m_queue[i]);
     }
 
     magma_finalize();
@@ -528,7 +528,8 @@ void cu_negation(datatype_t datatype,
                  int64_t x_offset,
                  void *y_data,
                  int64_t y_stride,
-                 int64_t y_offset)
+                 int64_t y_offset,
+                 int stream_id)
 {
     int block_size;
     int min_grid_size;
@@ -733,7 +734,8 @@ extern "C" void cu_addition(datatype_t datatype,
                             &((float32_t *) y_data)[y_offset],
                             (int) y_stride,
                             &((float32_t *) z_data)[z_offset],
-                            (int) z_stride);
+                            (int) z_stride,
+                            stream_id);
         break;
     case FLOAT64:
         cu_addition_float64((int) n, 
@@ -742,7 +744,8 @@ extern "C" void cu_addition(datatype_t datatype,
                             &((float64_t *) y_data)[y_offset],
                             (int) y_stride,
                             &((float64_t *) z_data)[z_offset],
-                            (int) z_stride);
+                            (int) z_stride,
+                            stream_id);
         break;
     default:
         break;
@@ -803,7 +806,8 @@ extern "C" void cu_subtraction(datatype_t datatype,
                                &((float32_t *) y_data)[y_offset],
                                (int) y_stride,
                                &((float32_t *) z_data)[z_offset],
-                               (int) z_stride);
+                               (int) z_stride,
+                               stream_id);
         break;
     case FLOAT64:
         cu_subtraction_float64((int) n, 
@@ -812,7 +816,8 @@ extern "C" void cu_subtraction(datatype_t datatype,
                                &((float64_t *) y_data)[y_offset],
                                (int) y_stride,
                                &((float64_t *) z_data)[z_offset],
-                               (int) z_stride);
+                               (int) z_stride,
+                               stream_id);
         break;
     default:
         break;
@@ -1202,7 +1207,8 @@ extern "C" void cu_matrix_multiplication(datatype_t datatype,
                                          y_transpose,
                                          &((float32_t *) x_data)[x_offset],
                                          &((float32_t *) y_data)[y_offset],
-                                         &((float32_t *) z_data)[z_offset]);
+                                         &((float32_t *) z_data)[z_offset],
+                                         stream_id);
         break;
     case FLOAT64:
         cu_matrix_multiplication_float64(datatype,
@@ -1213,7 +1219,8 @@ extern "C" void cu_matrix_multiplication(datatype_t datatype,
                                          y_transpose,
                                          &((float64_t *) x_data)[x_offset],
                                          &((float64_t *) y_data)[y_offset],
-                                         &((float64_t *) z_data)[z_offset]);
+                                         &((float64_t *) z_data)[z_offset],
+                                         stream_id);
         break;
     default:
         break;
@@ -1251,10 +1258,10 @@ extern "C" void cu_summation(datatype_t datatype, int64_t n, const void *x_data,
     switch (datatype)
     {
     case FLOAT32:
-        cu_summation_float32((int) n, &((float32_t *) x_data)[x_offset], (int) x_stride, &((float32_t *) y_data)[y_offset]);
+        cu_summation_float32((int) n, &((float32_t *) x_data)[x_offset], (int) x_stride, &((float32_t *) y_data)[y_offset], stream_id);
         break;
     case FLOAT64:
-        cu_summation_float64((int) n, &((float64_t *) x_data)[x_offset], (int) x_stride, &((float64_t *) y_data)[y_offset]);
+        cu_summation_float64((int) n, &((float64_t *) x_data)[x_offset], (int) x_stride, &((float64_t *) y_data)[y_offset], stream_id);
         break;
     default:
         break;
@@ -1316,7 +1323,7 @@ __global__ static void cu_maximum_float64(int n, const float64_t *x_data, int x_
     *y_data = current_maximum;
 }
 
-extern "C" void cu_maximum(datatype_t datatype, uint64_t n, const void *x_data, uint64_t x_stride, uint64_t x_offset, void *y_data, uint64_t y_offset, int stream_id)
+extern "C" void cu_maximum(datatype_t datatype, int64_t n, const void *x_data, int64_t x_stride, int64_t x_offset, void *y_data, int64_t y_offset, int stream_id)
 {
     int block_size;
     int min_grid_size;
@@ -1325,13 +1332,9 @@ extern "C" void cu_maximum(datatype_t datatype, uint64_t n, const void *x_data, 
     switch (datatype)
     {
     case FLOAT32:
-        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
-                cu_maximum_float32, 0, 0);
-        if (error != cudaSuccess) {
-            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
-        }
+        block_size = NW_WARP_SIZE * 24;
 
-        grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
+        grid_size = MAX(num_mp * 2, (((int) n / ILP_LEVEL) + block_size) / block_size);
 
         cu_maximum_float32<<<grid_size, block_size, 0, cuda_stream[stream_id % NW_NUM_STREAMS]>>>((int) n, &((float32_t *) x_data)[x_offset], (int) x_stride, &((float32_t *) y_data)[y_offset]);
 
@@ -1340,13 +1343,9 @@ extern "C" void cu_maximum(datatype_t datatype, uint64_t n, const void *x_data, 
 #endif
         break;
     case FLOAT64:
-        error = cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size,
-                cu_maximum_float64, 0, 0);
-        if (error != cudaSuccess) {
-            std::cout << cudaGetErrorName(error) << ", " << cudaGetErrorString(error) << "\n";
-        }
+        block_size = NW_WARP_SIZE * 24;
 
-        grid_size = MAX(min_grid_size, (n + block_size - 1) / block_size);
+        grid_size = MAX(num_mp * 2, (((int) n / ILP_LEVEL) + block_size) / block_size);
 
         cu_maximum_float64<<<grid_size, block_size, 0, cuda_stream[stream_id % NW_NUM_STREAMS]>>>((int) n, &((float64_t *) x_data)[x_offset], (int) x_stride, &((float64_t *) y_data)[y_offset]);
 

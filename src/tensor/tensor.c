@@ -13,6 +13,7 @@
 #include <math.h>
 
 bool_t no_gradient = false;
+bool_t no_lazy_eval = false;
 
 /**
  * @brief Dynamically memory allocate and initialize a tensor.
@@ -100,6 +101,28 @@ void with_no_gradient(bool_t flag)
             if (!previous)
             {
                 no_gradient = false;
+            }
+        }
+    }
+}
+
+void with_no_lazy_eval(bool_t flag)
+{
+    static uint64_t previous = 0;
+
+    if (flag)
+    {
+        ++previous;
+        no_lazy_eval = true;
+    }
+    else
+    {
+        if (previous > 0)
+        {
+            --previous; 
+            if (!previous)
+            {
+                no_lazy_eval = false;
             }
         }
     }
@@ -2137,6 +2160,7 @@ static nw_error_t *tensor_schedule(tensor_t *tensor, map_t *visited, int stream_
 
     nw_error_t *error = NULL;
     function_t *context = tensor->context;
+    string_t id = string_create("%lu", tensor->id);
 
     if (map_contains(visited, id))
     {
@@ -2160,7 +2184,7 @@ static nw_error_t *tensor_schedule(tensor_t *tensor, map_t *visited, int stream_
         case UNARY_OPERATION:
             if (operation->unary_operation != NULL)
             {
-                error = tensor_schedule(operation->unary_operation->x, stream_id);
+                error = tensor_schedule(operation->unary_operation->x, visited, stream_id);
             }
             else
             {
@@ -2170,13 +2194,13 @@ static nw_error_t *tensor_schedule(tensor_t *tensor, map_t *visited, int stream_
         case BINARY_OPERATION:
             if (operation->binary_operation != NULL)
             {
-                error = tensor_schedule(operation->binary_operation->x, stream_id);
+                error = tensor_schedule(operation->binary_operation->x, visited, stream_id);
                 if (error == NULL)
                 {
-                    error = tensor_schedule(operation->binary_operation->y, stream_id + 1);
+                    error = tensor_schedule(operation->binary_operation->y, visited, stream_id + 1);
                 }
-                function_synchronize(stream_id);
-                function_synchronize(stream_id + 1);
+                apply_synchronize(operation->binary_operation->x, stream_id);
+                apply_synchronize(operation->binary_operation->y, stream_id + 1);
             }
             else
             {
@@ -2186,7 +2210,7 @@ static nw_error_t *tensor_schedule(tensor_t *tensor, map_t *visited, int stream_
         case REDUCTION_OPERATION:
             if (operation->reduction_operation)
             {
-                error = tensor_schedule(operation->reduction_operation->x, stream_id);
+                error = tensor_schedule(operation->reduction_operation->x, visited, stream_id);
             }
             else
             {
@@ -2196,7 +2220,7 @@ static nw_error_t *tensor_schedule(tensor_t *tensor, map_t *visited, int stream_
         case STRUCTURE_OPERATION:
             if (operation->structure_operation)
             {
-                error = tensor_schedule(operation->structure_operation->x, stream_id);
+                error = tensor_schedule(operation->structure_operation->x, visited, stream_id);
             }
             else
             {
@@ -2207,24 +2231,33 @@ static nw_error_t *tensor_schedule(tensor_t *tensor, map_t *visited, int stream_
             // Leaf node
             break;
         default:
-            return ERROR(ERROR_UKNOWN_OPERATION_TYPE, string_create("unknown operation type %d.", (int) operation_type), NULL);
+            error = ERROR(ERROR_OPERATION_TYPE, string_create("unknown operation type %d.", (int) operation_type), NULL);
             break;
         }
 
         if (error != NULL)
         {
             error = ERROR(ERROR_FORWARD, string_create("failed to evaluate forward pass for tensor."), error);
+            goto cleanup;
         }
 
-        if (operation_type != STRUCTURE_OPERATION)
+        // TODO: CREATION could be lazy using setter dependency injection for storage.
+        if (operation_type != CREATION_OPERATION)
         {
-            error = function_forward(context, &tensor, stream_id);
+            error = apply_forward(tensor, stream_id);
             if (error != NULL)
             {
                 error = ERROR(ERROR_FORWARD, string_create("failed to evaluate forward pass for tensor."), error);
+                goto cleanup;
             }
         }
     }
+
+    return error;
+
+cleanup:
+
+    string_destroy(id);
 
     return error;
 }
@@ -2699,6 +2732,11 @@ nw_error_t *tensor_evaluate(tensor_t *x)
     nw_error_t *error = NULL;
     map_t *visited = NULL;
 
+    if (no_lazy_eval)
+    {
+        return ERROR(ERROR_FORWARD, string_create("evaluate is only used with lazy eval enabled."), error);
+    }
+
     error = map_create(&visited);
     if (error)
     {
@@ -2706,21 +2744,29 @@ nw_error_t *tensor_evaluate(tensor_t *x)
         goto cleanup;
     }
 
-    it (!no_lazy_eval)
+    if (!no_lazy_eval)
     {
         error = tensor_schedule(x, visited, 0);
         if (error != NULL)
         {
             error = ERROR(ERROR_FORWARD, string_create("failed to evaluate forward pass for tensor."), error);
+            goto cleanup;
         }
 
         // Wait until all ops on x are complete.
-        error = function_synchronize(x, 0);
+        error = apply_synchronize(x, 0);
         if (error != NULL)
         {
             error = ERROR(ERROR_FORWARD, string_create("failed to synchronize at end of forward pass for tensor."), error);
+            goto cleanup;
         }
     }
+
+    return error;
+
+cleanup:
+
+    map_destroy(visited);
 
     return error;
 }
@@ -2738,6 +2784,7 @@ nw_error_t *tensor_backward(tensor_t *x, tensor_t *gradient)
     PRINT_DEBUG_NEWLINE;
 
     with_no_gradient(true);
+    with_no_lazy_eval(true);
     nw_error_t *error = NULL;
     stack_t *tensors = NULL;
     map_t *visited = NULL;
@@ -2809,6 +2856,7 @@ cleanup:
     map_destroy(visited);
     stack_destroy(tensors);
     with_no_gradient(false);
+    with_no_lazy_eval(false);
     
     return error;
 }

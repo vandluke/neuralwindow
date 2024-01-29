@@ -75,10 +75,11 @@ nw_error_t *storage_synchronize(storage_t *storage, int stream_id)
     return NULL;
 }
 
-nw_error_t *buffer_create(buffer_t **buffer, view_t *view)
+nw_error_t *buffer_create(buffer_t **buffer, view_t *view, storage_t *storage, bool_t copy)
 {
     CHECK_NULL_ARGUMENT(buffer, "buffer");
     CHECK_NULL_ARGUMENT(view, "view");
+    CHECK_NULL_ARGUMENT(storage, "storage");
 
     nw_error_t *error = NULL;
 
@@ -89,15 +90,6 @@ nw_error_t *buffer_create(buffer_t **buffer, view_t *view)
     }
 
     (*buffer)->view = view;
-
-    return NULL;
-}
-
-nw_error_t buffer_set_storage(buffer_t **buffer, storage_t *storage, bool_t copy)
-{
-    CHECK_NULL_ARGUMENT(buffer, "buffer");
-    CHECK_NULL_ARGUMENT(*buffer, "*buffer");
-    CHECK_NULL_ARGUMENT(storage, "storage");
 
     if (copy)
     {
@@ -168,6 +160,8 @@ nw_error_t *buffer_unary_before(unary_operation_type_t unary_operation_type, buf
         }
     }
 
+    return error;
+
 cleanup:
 
     if (!overwrite)
@@ -183,6 +177,9 @@ nw_error_t *buffer_unary(unary_operation_type_t unary_operation_type, buffer_t *
     CHECK_NULL_ARGUMENT(x_buffer, "x_buffer");
     CHECK_NULL_ARGUMENT(y_buffer, "y_buffer");
     CHECK_NULL_ARGUMENT(x_buffer->view, "x_buffer->view");
+    CHECK_NULL_ARGUMENT((*y_buffer), "(*y_buffer)");
+    CHECK_NULL_ARGUMENT((*y_buffer)->view, "(*y_buffer)->view");
+    CHECK_NULL_ARGUMENT((*y_buffer)->storage, "(*y_buffer)->storage");
     CHECK_NULL_ARGUMENT(x_buffer->view->strides, "x_buffer->view->strides");
     CHECK_NULL_ARGUMENT(x_buffer->view->shape, "x_buffer->view->shape");
     CHECK_NULL_ARGUMENT(x_buffer->storage, "x_buffer->storage");
@@ -190,6 +187,7 @@ nw_error_t *buffer_unary(unary_operation_type_t unary_operation_type, buffer_t *
 
     nw_error_t *error = NULL;
 
+    bool_t overwrite = (bool_t) *y_buffer;
     datatype_t datatype = (*y_buffer)->storage->datatype;
     runtime_t runtime = (*y_buffer)->storage->runtime;
     int64_t rank = (*y_buffer)->view->rank;
@@ -388,10 +386,7 @@ nw_error_t *buffer_binary_before(binary_operation_type_t operation_type, buffer_
         }
     }
 
-    if (view != NULL)
-    {
-        view_destroy(view);
-    }
+    view_destroy(view);
 
     return error;
 
@@ -402,10 +397,7 @@ cleanup:
         buffer_destroy(*z_buffer);
     }
 
-    if (view != NULL)
-    {
-        view_destroy(view);
-    }
+    view_destroy(view);
 
     return error;
 }
@@ -415,6 +407,7 @@ static nw_error_t *buffer_matrix_multiplication(buffer_t *x_buffer, buffer_t *y_
     CHECK_NULL_ARGUMENT(x_buffer, "x_buffer");
     CHECK_NULL_ARGUMENT(y_buffer, "y_buffer");
     CHECK_NULL_ARGUMENT(z_buffer, "z_buffer");
+    CHECK_NULL_ARGUMENT((*z_buffer), "(*z_buffer)");
     CHECK_NULL_ARGUMENT(x_buffer->view, "x_buffer->view");
     CHECK_NULL_ARGUMENT(y_buffer->view, "y_buffer->view");
     CHECK_NULL_ARGUMENT(x_buffer->view->strides, "x_buffer->view->strides");
@@ -423,13 +416,14 @@ static nw_error_t *buffer_matrix_multiplication(buffer_t *x_buffer, buffer_t *y_
     CHECK_NULL_ARGUMENT(y_buffer->view->shape, "y_buffer->view->shape");
     CHECK_NULL_ARGUMENT(x_buffer->storage, "x_buffer->storage");
     CHECK_NULL_ARGUMENT(y_buffer->storage, "y_buffer->storage");
+    CHECK_NULL_ARGUMENT((*z_buffer)->storage, "(*z_buffer)->storage");
     CHECK_NULL_ARGUMENT(x_buffer->storage->data, "x_buffer->storage->data");
     CHECK_NULL_ARGUMENT(y_buffer->storage->data, "y_buffer->storage->data");
 
     nw_error_t *error = NULL;
     bool_t overwrite = (bool_t) *z_buffer;
-    runtime_t runtime;
-    datatype_t datatype;
+    runtime_t runtime = (*z_buffer)->storage->runtime;
+    datatype_t datatype = (*z_buffer)->storage->datatype;
 
     void *x_data = x_buffer->storage->data;
     void *y_data = y_buffer->storage->data;
@@ -547,6 +541,7 @@ static nw_error_t *buffer_binary_elementwise(binary_operation_type_t binary_oper
     CHECK_NULL_ARGUMENT(x_buffer, "x_buffer");
     CHECK_NULL_ARGUMENT(y_buffer, "y_buffer");
     CHECK_NULL_ARGUMENT(z_buffer, "z_buffer");
+    CHECK_NULL_ARGUMENT((*z_buffer), "(*z_buffer)");
     CHECK_NULL_ARGUMENT(x_buffer->view, "x_buffer->view");
     CHECK_NULL_ARGUMENT(y_buffer->view, "y_buffer->view");
     CHECK_NULL_ARGUMENT(x_buffer->view->strides, "x_buffer->view->strides");
@@ -555,15 +550,15 @@ static nw_error_t *buffer_binary_elementwise(binary_operation_type_t binary_oper
     CHECK_NULL_ARGUMENT(y_buffer->view->shape, "y_buffer->view->shape");
     CHECK_NULL_ARGUMENT(x_buffer->storage, "x_buffer->storage");
     CHECK_NULL_ARGUMENT(y_buffer->storage, "y_buffer->storage");
+    CHECK_NULL_ARGUMENT((*z_buffer)->storage, "(*z_buffer)->storage");
     CHECK_NULL_ARGUMENT(x_buffer->storage->data, "x_buffer->storage->data");
     CHECK_NULL_ARGUMENT(y_buffer->storage->data, "y_buffer->storage->data");
 
     nw_error_t *error = NULL;
     bool_t overwrite = (bool_t) *z_buffer;
     int64_t rank = MAX(x_buffer->view->rank, y_buffer->view->rank);
-    int64_t shape[rank];
-    runtime_t runtime;
-    datatype_t datatype;
+    runtime_t runtime = (*z_buffer)->storage->runtime;
+    datatype_t datatype = (*z_buffer)->storage->datatype;
 
     void *x_data = x_buffer->storage->data;
     void *y_data = y_buffer->storage->data;
@@ -989,6 +984,8 @@ static nw_error_t *runtime_reduction_dimension(reduction_operation_type_t reduct
 
 nw_error_t *buffer_reduction_before(reduction_operation_type_t reduction_operation_type, buffer_t *x, int64_t *axis, int64_t length, buffer_t **result, bool_t keep_dimension)
 {
+    UNUSED(reduction_operation_type);
+
     CHECK_NULL_ARGUMENT(x, "x");
     CHECK_NULL_ARGUMENT(x->view, "x->view");
     CHECK_NULL_ARGUMENT(x->storage, "x->storage");
@@ -1318,10 +1315,10 @@ static nw_error_t *buffer_create_empty(buffer_t **buffer, const int64_t *shape, 
         goto cleanup;
     }
 
-    error = buffer_set_storage(buffer, storage, false);
+    error = buffer_create(buffer, view, storage, false);
     if (error)
     {
-        error = ERROR(ERROR_CREATE, string_create("failed to assign buffer backing memory."), error);
+        error = ERROR(ERROR_CREATE, string_create("failed to create buffer."), error);
         goto cleanup;
     }
 
@@ -1329,6 +1326,7 @@ static nw_error_t *buffer_create_empty(buffer_t **buffer, const int64_t *shape, 
 
 cleanup:
 
+    view_destroy(view);
     storage_destroy(storage);
 
     return error;
@@ -1338,10 +1336,10 @@ static nw_error_t *buffer_create_nonempty(buffer_t **buffer, const int64_t *shap
                                           int64_t offset, runtime_t runtime, datatype_t datatype, void *data, bool_t copy)
 {
     CHECK_NULL_ARGUMENT(buffer, "buffer");
-    CHECK_NULL_ARGUMENT(buffer->view, "buffer->view");
+    CHECK_NULL_ARGUMENT(shape, "shape");
 
     nw_error_t *error = NULL;
-    view_t *view = buffer->view;
+    view_t *view = NULL;
     storage_t *storage = NULL;
     int64_t n = 0;
 
@@ -1366,10 +1364,10 @@ static nw_error_t *buffer_create_nonempty(buffer_t **buffer, const int64_t *shap
         goto cleanup;
     }
 
-    error = buffer_set_storage(buffer, storage, false);
+    error = buffer_create(buffer, view, storage, false);
     if (error)
     {
-        error = ERROR(ERROR_CREATE, string_create("failed to assign buffer backing memory."), error);
+        error = ERROR(ERROR_CREATE, string_create("failed to create buffer."), error);
         goto cleanup;
     }
 
@@ -1377,6 +1375,7 @@ static nw_error_t *buffer_create_nonempty(buffer_t **buffer, const int64_t *shap
 
 cleanup:
 
+    view_destroy(view);
     storage_destroy(storage);
 
     return error;

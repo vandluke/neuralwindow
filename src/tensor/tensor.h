@@ -107,4 +107,5 @@ nw_error_t *tensor_evaluate(tensor_t *x);
 nw_error_t *tensor_backward(tensor_t *x, tensor_t *gradient);
 nw_error_t *tensor_accumulate_gradient(tensor_t *x, tensor_t *gradient);
 void with_no_gradient(bool_t flag);
+void with_no_lazy_eval(bool_t flag);
 #endif

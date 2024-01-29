@@ -304,8 +304,11 @@ void view_destroy(view_t *view)
 {
     if (view)
     {
-        free(view->shape);
-        free(view->strides);
+        if (view->rank)
+        {
+            free(view->shape);
+            free(view->strides);
+        }
         free(view);
     }
 }

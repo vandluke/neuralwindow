@@ -459,10 +459,12 @@ void test_unary(tensor_unary_type_t tensor_unary_type)
 
                 // Back prop
                 tensor_t *cost = NULL;
+                with_no_lazy_eval(true);
                 error = tensor_summation(returned_tensors[i][j][k], &cost, NULL, 0, false);
                 ck_assert_ptr_null(error);
                 error = tensor_backward(cost, NULL);
                 ck_assert_ptr_null(error);
+                with_no_lazy_eval(false);
 
                 ck_assert_tensor_equiv(tensors[i][j][k]->gradient, expected_gradients[i][j][k]);
             }

@@ -130,7 +130,7 @@ void runtime_free(void *data, runtime_t runtime)
 }
 
 void runtime_unary(unary_operation_type_t unary_operation_type, runtime_t runtime, datatype_t datatype, int64_t n, 
-                   void *x_data, int64_t x_stride, int64_t x_offset, void *y_data, int64_t y_stride, int64_t y_offset)
+                   void *x_data, int64_t x_stride, int64_t x_offset, void *y_data, int64_t y_stride, int64_t y_offset, int stream_id)
 {
     switch (runtime)
     {
@@ -213,34 +213,34 @@ void runtime_unary(unary_operation_type_t unary_operation_type, runtime_t runtim
         switch (unary_operation_type)
         {
         case EXPONENTIAL_OPERATION:
-            cu_exponential(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+            cu_exponential(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
             break;
         case LOGARITHM_OPERATION:
-            cu_logarithm(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+            cu_logarithm(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
             break;
         case SINE_OPERATION:
-            cu_sine(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+            cu_sine(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
             break;
         case COSINE_OPERATION:
-            cu_cosine(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+            cu_cosine(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
             break;
         case SQUARE_ROOT_OPERATION:
-            cu_square_root(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+            cu_square_root(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
             break;
         case CONTIGUOUS_OPERATION:
-            cu_copy(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+            cu_copy(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
             break;
         case NEGATION_OPERATION:
-            cu_negation(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+            cu_negation(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
             break;
         case RECTIFIED_LINEAR_OPERATION:
-            cu_rectified_linear(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+            cu_rectified_linear(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
             break;
         case SIGMOID_OPERATION:
-            cu_sigmoid(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+            cu_sigmoid(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
             break;
         case RECIPROCAL_OPERATION:
-            cu_reciprocal(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset);
+            cu_reciprocal(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, stream_id);
             break;
         default:
             break;
@@ -254,7 +254,7 @@ void runtime_unary(unary_operation_type_t unary_operation_type, runtime_t runtim
 
 void runtime_binary_elementwise(binary_operation_type_t binary_operation_type, runtime_t runtime, datatype_t datatype, int64_t n,
                                 void *x_data, int64_t x_stride, int64_t x_offset, void *y_data, int64_t y_stride, int64_t y_offset,
-                                void *z_data, int64_t z_stride, int64_t z_offset)
+                                void *z_data, int64_t z_stride, int64_t z_offset, int stream_id)
 {
     switch (runtime)
     {
@@ -319,25 +319,25 @@ void runtime_binary_elementwise(binary_operation_type_t binary_operation_type, r
         switch (binary_operation_type)
         {
         case ADDITION_OPERATION:
-            cu_addition(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, z_data, z_stride, z_offset);
+            cu_addition(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, z_data, z_stride, z_offset, stream_id);
             break;
         case SUBTRACTION_OPERATION:
-            cu_subtraction(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, z_data, z_stride, z_offset);
+            cu_subtraction(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, z_data, z_stride, z_offset, stream_id);
             break;
         case MULTIPLICATION_OPERATION:
-            cu_multiplication(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, z_data, z_stride, z_offset);
+            cu_multiplication(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, z_data, z_stride, z_offset, stream_id);
             break;
         case DIVISION_OPERATION:
-            cu_division(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, z_data, z_stride, z_offset);
+            cu_division(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, z_data, z_stride, z_offset, stream_id);
             break;
         case POWER_OPERATION:  
-            cu_power(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, z_data, z_stride, z_offset);
+            cu_power(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, z_data, z_stride, z_offset, stream_id);
             break;
         case COMPARE_EQUAL_OPERATION:
-            cu_compare_equal(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, z_data, z_stride, z_offset);
+            cu_compare_equal(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, z_data, z_stride, z_offset, stream_id);
             break;
         case COMPARE_GREATER_OPERATION:
-            cu_compare_greater(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, z_data, z_stride, z_offset);
+            cu_compare_greater(datatype, n, x_data, x_stride, x_offset, y_data, y_stride, y_offset, z_data, z_stride, z_offset, stream_id);
             break;
         default:
             break;
@@ -350,7 +350,7 @@ void runtime_binary_elementwise(binary_operation_type_t binary_operation_type, r
 }
 
 void runtime_matrix_multiplication(runtime_t runtime, datatype_t datatype, int64_t m, int64_t k, int64_t n, bool_t x_transpose, bool_t y_transpose,
-                                   void *x_data, int64_t x_offset, void *y_data, int64_t y_offset, void *z_data, int64_t z_offset)
+                                   void *x_data, int64_t x_offset, void *y_data, int64_t y_offset, void *z_data, int64_t z_offset, int stream_id)
 {
     switch (runtime)
     {
@@ -362,7 +362,7 @@ void runtime_matrix_multiplication(runtime_t runtime, datatype_t datatype, int64
         break;
 #ifndef CPU_ONLY
     case CU_RUNTIME:
-        cu_matrix_multiplication(datatype, m, k, n, x_transpose, y_transpose, x_data, x_offset, y_data, y_offset, z_data, z_offset);
+        cu_matrix_multiplication(datatype, m, k, n, x_transpose, y_transpose, x_data, x_offset, y_data, y_offset, z_data, z_offset, stream_id);
         break;
 #endif
     default:
@@ -371,7 +371,7 @@ void runtime_matrix_multiplication(runtime_t runtime, datatype_t datatype, int64
 }
 
 void runtime_reduction(reduction_operation_type_t reduction_operation_type, runtime_t runtime, datatype_t datatype, int64_t n,
-                       void *x_data, int64_t x_stride, int64_t x_offset, void *y_data, int64_t y_offset)
+                       void *x_data, int64_t x_stride, int64_t x_offset, void *y_data, int64_t y_offset, int stream_id)
 {
     switch (runtime)
     {
@@ -406,10 +406,10 @@ void runtime_reduction(reduction_operation_type_t reduction_operation_type, runt
         switch (reduction_operation_type)
         {
         case MAXIMUM_OPERATION:
-            cu_maximum(datatype, n, x_data, x_stride, x_offset, y_data, y_offset);
+            cu_maximum(datatype, n, x_data, x_stride, x_offset, y_data, y_offset, stream_id);
             break;
         case SUMMATION_OPERATION:
-            cu_summation(datatype, n, x_data, x_stride, x_offset, y_data, y_offset);
+            cu_summation(datatype, n, x_data, x_stride, x_offset, y_data, y_offset, stream_id);
             break;
         default:
             break;

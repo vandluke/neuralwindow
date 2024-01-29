@@ -30,14 +30,14 @@ void runtime_synchronize(runtime_t runtime, int stream_id);
 nw_error_t *runtime_malloc(void **data, int64_t n, datatype_t datatype, runtime_t runtime);
 void runtime_free(void *data, runtime_t runtime);
 void runtime_unary(unary_operation_type_t unary_operation_type, runtime_t runtime, datatype_t datatype, int64_t n, 
-                   void *x_data, int64_t x_stride, int64_t x_offset, void *y_data, int64_t y_stride, int64_t y_offset);
+                   void *x_data, int64_t x_stride, int64_t x_offset, void *y_data, int64_t y_stride, int64_t y_offset, int stream_id);
 void runtime_binary_elementwise(binary_operation_type_t binary_operation_type, runtime_t runtime, datatype_t datatype, int64_t n,
                                 void *x_data, int64_t x_stride, int64_t x_offset, void *y_data, int64_t y_stride, int64_t y_offset,
-                                void *z_data, int64_t z_stride, int64_t z_offset);
+                                void *z_data, int64_t z_stride, int64_t z_offset, int stream_id);
 void runtime_matrix_multiplication(runtime_t runtime, datatype_t datatype, int64_t m, int64_t k, int64_t n, bool_t x_transpose, bool_t y_transpose,
-                                   void *x_data, int64_t x_offset, void *y_data, int64_t y_offset, void *z_data, int64_t z_offset);
+                                   void *x_data, int64_t x_offset, void *y_data, int64_t y_offset, void *z_data, int64_t z_offset, int stream_id);
 void runtime_reduction(reduction_operation_type_t reduction_operation_type, runtime_t runtime, datatype_t datatype, int64_t n,
-                       void *x_data, int64_t x_stride, int64_t x_offset, void *y_data, int64_t y_offset);
+                       void *x_data, int64_t x_stride, int64_t x_offset, void *y_data, int64_t y_offset, int stream_id);
 string_t runtime_string(runtime_t runtime);
 void runtime_zeroes(void *data, int64_t n, datatype_t datatype);
 void runtime_ones(void *data, int64_t n, datatype_t datatype);
