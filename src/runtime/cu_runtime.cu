@@ -1326,7 +1326,6 @@ __global__ static void cu_maximum_float64(int n, const float64_t *x_data, int x_
 extern "C" void cu_maximum(datatype_t datatype, int64_t n, const void *x_data, int64_t x_stride, int64_t x_offset, void *y_data, int64_t y_offset, int stream_id)
 {
     int block_size;
-    int min_grid_size;
     int grid_size;
 
     switch (datatype)

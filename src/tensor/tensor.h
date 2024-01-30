@@ -23,6 +23,7 @@ typedef struct tensor_t
     struct tensor_t *gradient;
     bool_t requires_gradient;
     bool_t persist;
+    bool_t internal;
 } tensor_t;
 
 // Constructor

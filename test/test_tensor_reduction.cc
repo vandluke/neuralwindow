@@ -493,10 +493,12 @@ void test_reduction(tensor_reduction_type_t tensor_reduction_type, bool_t test_g
                     expected_tensor.sum().backward();
                     expected_gradient[i][j][k][l] = torch_to_tensor(torch_tensors[i][j][k][l].grad(), (runtime_t) i, (datatype_t) j);
                     tensor_t *cost = NULL;
+                    with_no_lazy_eval(true);
                     error = tensor_summation(returned_tensors[i][j][k][l], &cost, NULL, 0, false);
                     ck_assert_ptr_null(error);
                     error = tensor_backward(cost, NULL);
                     ck_assert_ptr_null(error);
+                    with_no_lazy_eval(false);
 
                     ck_assert_tensor_equiv(tensors[i][j][k][l]->gradient, expected_gradient[i][j][k][l]);
                 }

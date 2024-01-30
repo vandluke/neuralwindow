@@ -3260,17 +3260,17 @@ static nw_error_t *apply_function(operation_t *operation, operation_type_t opera
         goto cleanup;
     }
 
-    if ((operation_type == CREATION_OPERATION) || no_lazy_eval)
-    {
-        // Run forward pass immediately.
-        function_forward(function, *result, 0);
-    }
-
     if ((*result)->context)
     {
         function_destroy((*result)->context, true);
     }
     (*result)->context = function;
+
+    if ((operation_type == CREATION_OPERATION) || no_lazy_eval)
+    {
+        // Run forward pass immediately.
+        function_forward(function, *result, 0);
+    }
 
     return error;
 
@@ -3419,12 +3419,12 @@ nw_error_t *apply_operation_binary(binary_operation_type_t binary_operation_type
     {
         if (x != x_broadcasted)
         {
-            tensor_destroy(x_broadcasted);    
+            x_broadcasted->internal = true;
         }
 
         if (y != y_broadcasted)
         {
-            tensor_destroy(y_broadcasted);    
+            y_broadcasted->internal = true;
         }
     }
 

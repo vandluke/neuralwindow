@@ -227,16 +227,21 @@ void test_structure(tensor_structure_type_t tensor_structure_type, std::vector<i
                 }
                 ck_assert_ptr_null(error);
 
+                error = tensor_evaluate(returned_tensors[tensor_structure_type][i][j][k]);
+                ck_assert_ptr_null(error);
+
                 ck_assert_tensor_equiv(returned_tensors[tensor_structure_type][i][j][k], expected_tensors[tensor_structure_type][i][j][k]);
 
                 // Back prop
                 expected_tensor.sum().backward();
                 expected_gradient[tensor_structure_type][i][j].push_back(torch_to_tensor(torch_tensors[tensor_structure_type][i][j][k].grad(), (runtime_t) i, (datatype_t) j));
                 tensor_t *cost = NULL;
+                with_no_lazy_eval(true);
                 error = tensor_summation(returned_tensors[tensor_structure_type][i][j][k], &cost, NULL, 0, false);
                 ck_assert_ptr_null(error);
                 error = tensor_backward(cost, NULL);
                 ck_assert_ptr_null(error);
+                with_no_lazy_eval(false);
 
                 ck_assert_tensor_equiv(tensors[tensor_structure_type][i][j][k]->gradient, expected_gradient[tensor_structure_type][i][j][k]);
             }
