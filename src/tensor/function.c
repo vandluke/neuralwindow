@@ -3216,12 +3216,6 @@ static nw_error_t *function_forward(function_t *function, tensor_t *result, int 
                      operation_type_string(function->operation_type)), error);
     }
 
-    if (!result->requires_gradient || no_gradient)
-    {
-        function_destroy(function, true);
-        result->context = NULL;
-    }
-
     return error;
 }
 
@@ -3415,18 +3409,21 @@ nw_error_t *apply_operation_binary(binary_operation_type_t binary_operation_type
         goto cleanup;
     }
 
-    if (!(x->requires_gradient || y->requires_gradient) || no_gradient)
-    {
-        if (x != x_broadcasted)
-        {
-            x_broadcasted->internal = true;
-        }
+    //if (!(x->requires_gradient || y->requires_gradient) || no_gradient)
+    //{
+    //    if (x != x_broadcasted)
+    //    {
+    //        tensor_destroy(x_broadcasted);
+    //    }
+    //
+    //    if (y != y_broadcasted)
+    //    {
+    //        tensor_destroy(y_broadcasted);
+    //    }
+    //}
 
-        if (y != y_broadcasted)
-        {
-            y_broadcasted->internal = true;
-        }
-    }
+    x_broadcasted->requires_gradient = x->requires_gradient;
+    y_broadcasted->requires_gradient = y->requires_gradient;
 
     return error;
 

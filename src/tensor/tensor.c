@@ -48,9 +48,6 @@ nw_error_t *tensor_create(tensor_t **tensor, buffer_t *buffer, function_t *conte
     (*tensor)->gradient = gradient;
     (*tensor)->requires_gradient = requires_gradient;
     (*tensor)->persist = persist;
-    // Not exposed by APIs. Internal tensors will get destroyed automatically
-    // during the forward pass.
-    (*tensor)->internal = false;
 
     return NULL;
 }
@@ -246,12 +243,6 @@ nw_error_t *tensor_concatenation(const tensor_t *x, const tensor_t *y, tensor_t 
     {
         error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
         goto cleanup;
-    }
-
-    if ((!x_padded->requires_gradient && !y_padded->requires_gradient) || no_gradient)
-    {
-        x_padded->internal = true;
-        y_padded->internal = true;
     }
 
     return error;
@@ -2174,6 +2165,9 @@ static nw_error_t *tensor_schedule(tensor_t *tensor, map_t *visited, stack_t *de
     function_t *context = tensor->context;
     string_t id = string_create("%lu", tensor->id);
 
+    tensor_t *x = NULL;
+    tensor_t *y = NULL;
+
     if (map_contains(visited, id))
     {
         goto cleanup;
@@ -2196,7 +2190,9 @@ static nw_error_t *tensor_schedule(tensor_t *tensor, map_t *visited, stack_t *de
         case UNARY_OPERATION:
             if (operation->unary_operation != NULL)
             {
-                error = tensor_schedule(operation->unary_operation->x, visited, destruct, stream_id);
+                x = operation->unary_operation->x;
+
+                error = tensor_schedule(x, visited, destruct, stream_id);
             }
             else
             {
@@ -2206,15 +2202,15 @@ static nw_error_t *tensor_schedule(tensor_t *tensor, map_t *visited, stack_t *de
         case BINARY_OPERATION:
             if (operation->binary_operation != NULL)
             {
-                tensor_t *x = operation->binary_operation->x;
-                tensor_t *y = operation->binary_operation->y;
+                x = operation->binary_operation->x;
+                y = operation->binary_operation->y;
 
                 error = tensor_schedule(x, visited, destruct, stream_id);
                 if (error == NULL)
                 {
                     error = tensor_schedule(y, visited, destruct, stream_id + 1);
                 }
-                apply_synchronize(x, stream_id);
+
                 apply_synchronize(y, stream_id + 1);
             }
             else
@@ -2225,7 +2221,9 @@ static nw_error_t *tensor_schedule(tensor_t *tensor, map_t *visited, stack_t *de
         case REDUCTION_OPERATION:
             if (operation->reduction_operation)
             {
-                error = tensor_schedule(operation->reduction_operation->x, visited, destruct, stream_id);
+                x = operation->reduction_operation->x;
+
+                error = tensor_schedule(x, visited, destruct, stream_id);
             }
             else
             {
@@ -2235,7 +2233,9 @@ static nw_error_t *tensor_schedule(tensor_t *tensor, map_t *visited, stack_t *de
         case STRUCTURE_OPERATION:
             if (operation->structure_operation)
             {
-                error = tensor_schedule(operation->structure_operation->x, visited, destruct, stream_id);
+                x = operation->structure_operation->x;
+
+                error = tensor_schedule(x, visited, destruct, stream_id);
             }
             else
             {
@@ -2265,16 +2265,30 @@ static nw_error_t *tensor_schedule(tensor_t *tensor, map_t *visited, stack_t *de
                 error = ERROR(ERROR_FORWARD, string_create("failed to evaluate forward pass for tensor."), error);
                 goto cleanup;
             }
-        }
 
-        if (tensor->internal)
-        {
-            error = stack_push(destruct, tensor);
-            if (error)
+            if (!tensor->requires_gradient || no_gradient)
             {
-                error = ERROR(ERROR_PUSH, string_create("failed to push tensor to stack."), error);
-                goto cleanup;
+                if ((x != NULL) && !x->persist)
+                {
+                    error = stack_push(destruct, x);
+                    if (error)
+                    {
+                        error = ERROR(ERROR_PUSH, string_create("failed to push tensor to stack."), error);
+                        goto cleanup;
+                    }
+                }
+
+                if ((y != NULL) && !y->persist)
+                {
+                    error = stack_push(destruct, y);
+                    if (error)
+                    {
+                        error = ERROR(ERROR_PUSH, string_create("failed to push tensor to stack."), error);
+                        goto cleanup;
+                    }
+                }
             }
+
         }
     }
 
