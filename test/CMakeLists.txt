@@ -25,6 +25,7 @@ set(TEST_CXX
     test_autograd
     test_optimizer
     test_model_exporter
+    test_rnn
 )
 
 set(TEST_CXX_PERF

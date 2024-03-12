@@ -6,6 +6,7 @@
 #include <function.h>
 #include <math.h>
 #include <string.h>
+#include <map.h>
 
 extern bool_t no_gradient;
 
@@ -841,7 +842,6 @@ nw_error_t *convolution_transpose_2d_layer_create_from_parameters(layer_t **laye
 
     return error;
 }
-
 
 nw_error_t *convolution_transpose_2d_layer_create(layer_t **layer, int64_t kernel_size, int64_t padding, int64_t stride,
                                                   int64_t in_channels, int64_t out_channels, runtime_t runtime, datatype_t datatype,
@@ -1840,6 +1840,707 @@ nw_error_t *gelu_activation_layer_create(layer_t **layer)
     return error;
 }
 
+//insert create
+nw_error_t *rnn_cell_create(rnn_cell_t **rnn, activation_function_type_t activation, tensor_t *weight_ih, tensor_t *bias_ih, tensor_t *weight_hh, tensor_t *bias_hh)
+{
+    CHECK_NULL_ARGUMENT(rnn, "rnn");
+    CHECK_NULL_ARGUMENT(weight_ih, "weight_ih");
+    CHECK_NULL_ARGUMENT(weight_hh, "weight_hh");
+    CHECK_NULL_ARGUMENT(activation, "activation");
+
+    *rnn = (rnn_cell_t *) malloc(sizeof(rnn_cell_t));
+    if (!*rnn)
+    {
+        return ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", sizeof(rnn_cell_t)), NULL);
+    }
+
+    (*rnn)->weight_ih = weight_ih;
+    (*rnn)->bias_ih = bias_ih;
+    (*rnn)->weight_hh = weight_hh;
+    (*rnn)->weight_ih = weight_ih;
+    (*rnn)->bias_hh = bias_hh;
+    (*rnn)->activation = activation;
+
+    return NULL;
+}
+
+void rnn_cell_destroy(rnn_cell_t *cell)
+{
+    if (cell)
+    {
+        tensor_destroy(cell->weight_ih);
+        tensor_destroy(cell->bias_ih);
+        tensor_destroy(cell->weight_hh);
+        tensor_destroy(cell->bias_hh);
+    free(cell);
+    }
+}
+
+nw_error_t *gru_cell_create(gru_cell_t **gru, tensor_t *weight_ir, tensor_t *weight_iz, tensor_t *weight_in, tensor_t *weight_hr, tensor_t *weight_hz, tensor_t *weight_hn, 
+                            tensor_t *bias_ir, tensor_t *bias_iz, tensor_t *bias_in, tensor_t *bias_hr, tensor_t *bias_hz, tensor_t *bias_hn)
+{
+    CHECK_NULL_ARGUMENT(gru, "gru");
+    CHECK_NULL_ARGUMENT(weight_ir, "weight_ir");
+    CHECK_NULL_ARGUMENT(weight_iz, "weight_iz");
+    CHECK_NULL_ARGUMENT(weight_in, "weight_in");
+    CHECK_NULL_ARGUMENT(weight_hr, "weight_hr");
+    CHECK_NULL_ARGUMENT(weight_hz, "weight_hz");
+    CHECK_NULL_ARGUMENT(weight_hn, "weight_hn");
+
+    *gru = (gru_cell_t *) malloc(sizeof(gru_cell_t));
+    if (!*gru)
+    {
+        return ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", sizeof(gru_cell_t)), NULL);
+    }
+
+    (*gru)->weight_ir = weight_ir;
+    (*gru)->weight_iz = weight_iz;
+    (*gru)->weight_in = weight_in;
+    (*gru)->weight_hr = weight_hr;
+    (*gru)->weight_hz = weight_hz;
+    (*gru)->weight_hn = weight_hn;
+    (*gru)->bias_ir = bias_ir;
+    (*gru)->bias_iz = bias_iz;
+    (*gru)->bias_in = bias_in;
+    (*gru)->bias_hr = bias_hr;
+    (*gru)->bias_hz = bias_hz;
+    (*gru)->bias_hn = bias_hn;
+
+    return NULL;             
+}
+
+void gru_cell_destroy(gru_cell_t *cell)
+{
+    if (cell) 
+    {
+        tensor_destroy(cell->weight_ir);
+        tensor_destroy(cell->weight_iz);
+        tensor_destroy(cell->weight_in);
+        tensor_destroy(cell->weight_hr);
+        tensor_destroy(cell->weight_hz);
+        tensor_destroy(cell->weight_hn);
+        tensor_destroy(cell->bias_ir);
+        tensor_destroy(cell->bias_iz);
+        tensor_destroy(cell->bias_in);
+        tensor_destroy(cell->bias_hr);
+        tensor_destroy(cell->bias_hz);
+        tensor_destroy(cell->bias_hn);
+
+        free(cell);
+    }
+}
+
+nw_error_t *lstm_cell_create(lstm_cell_t **lstm, tensor_t *weight_xi, tensor_t *weight_hi, tensor_t *bias_xi, tensor_t *bias_hi, tensor_t *weight_xf, tensor_t *weight_hf, tensor_t *bias_xf, tensor_t *bias_hf, 
+                            tensor_t *weight_xc, tensor_t *weight_hc, tensor_t *bias_xc, tensor_t *bias_hc, tensor_t *weight_xo, tensor_t *weight_ho, tensor_t *bias_xo, tensor_t *bias_ho, tensor_t *cell_state)
+{
+    CHECK_NULL_ARGUMENT(lstm, "lstm");
+    CHECK_NULL_ARGUMENT(weight_xi, "weight_xi");
+    CHECK_NULL_ARGUMENT(weight_hi, "weight_hi");
+    CHECK_NULL_ARGUMENT(weight_xf, "weight_xf");
+    CHECK_NULL_ARGUMENT(weight_hf, "weight_hf");
+    CHECK_NULL_ARGUMENT(weight_xc, "weight_xc");
+    CHECK_NULL_ARGUMENT(weight_hc, "weight_hc");
+    CHECK_NULL_ARGUMENT(weight_xo, "weight_xo");
+    CHECK_NULL_ARGUMENT(weight_ho, "weight_ho");
+    CHECK_NULL_ARGUMENT(cell_state, "cell_state");
+
+    *lstm = (lstm_cell_t *) malloc(sizeof(lstm_cell_t));
+    if (!*lstm)
+    {
+        return ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", sizeof(lstm_cell_t)), NULL);
+    }
+
+    (*lstm)->weight_xi = weight_xi;
+    (*lstm)->weight_hi = weight_hi;
+    (*lstm)->bias_xi = bias_xi;
+    (*lstm)->bias_hi = bias_hi;
+    (*lstm)->weight_xf = weight_xf;
+    (*lstm)->weight_hf = weight_hf;
+    (*lstm)->bias_xf = bias_xf;
+    (*lstm)->bias_hf = bias_hf;
+    (*lstm)->weight_xc = weight_xc;
+    (*lstm)->weight_hc = weight_hc;
+    (*lstm)->bias_xc = bias_xc;
+    (*lstm)->bias_hc = bias_hc;
+    (*lstm)->weight_xo = weight_xo;
+    (*lstm)->weight_ho = weight_ho;
+    (*lstm)->bias_xo = bias_xo;
+    (*lstm)->bias_ho = bias_ho;
+    (*lstm)->cell_state = cell_state;
+
+    return NULL; 
+}
+
+void lstm_cell_destroy(lstm_cell_t *cell)
+{
+    if (cell) 
+    {
+        tensor_destroy(cell->weight_xi);
+        tensor_destroy(cell->weight_hi);
+        tensor_destroy(cell->bias_xi);
+        tensor_destroy(cell->bias_hi);
+
+        tensor_destroy(cell->weight_xf);
+        tensor_destroy(cell->weight_hf);
+        tensor_destroy(cell->bias_xf);
+        tensor_destroy(cell->bias_hf);
+
+        tensor_destroy(cell->weight_xc);
+        tensor_destroy(cell->weight_hc);
+        tensor_destroy(cell->bias_xc);
+        tensor_destroy(cell->bias_hc);
+
+        tensor_destroy(cell->weight_xo);
+        tensor_destroy(cell->weight_ho);
+        tensor_destroy(cell->bias_xo);
+        tensor_destroy(cell->bias_ho);
+
+        tensor_destroy(cell->cell_state);
+
+        free(cell);
+    }
+}
+
+nw_error_t *rnn_layer_create(rnn_layer_t **layer, recurrent_type_t type, int64_t batch_size, int64_t hidden_size, int64_t input_size, runtime_t runtime, datatype_t datatype, bool_t bidirectional,
+                             parameter_init_t *weight_init, parameter_init_t *bias_init, activation_function_type_t activation)
+{
+    CHECK_NULL_ARGUMENT(layer, "layer");
+    CHECK_NULL_ARGUMENT(weight_init, "weight_init");
+
+   *layer = (rnn_layer_t *) malloc(sizeof(rnn_layer_t));
+   if (!*layer)
+   {
+        return ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytees.", sizeof(rnn_layer_t)), NULL);
+   }
+
+   nw_error_t *error = NULL;
+
+   (*layer)->type = type;
+   (*layer)->hidden_size = hidden_size;
+   (*layer)->input_size = input_size;
+   (*layer)->bidirectional = bidirectional;
+
+   map_t *map = NULL;
+   error = map_create(&map);
+   (*layer)->cells = map;
+
+   string_t index;
+   for (int64_t i = 0; i < hidden_size; ++i)
+   {
+        index = string_create("%lu", i);
+
+        switch(type)
+        {
+            case RNN:
+                rnn_cell_t *rnn = NULL;
+                tensor_t *weight_ih, *bias_ih, *weight_hh, *bias_hh;
+                int64_t *weight_ih_shape, *weight_hh_shape, weight_ih_rank, weight_hh_rank, *bias_ih_shape, *bias_hh_shape, bias_ih_rank, bias_hh_rank;
+
+                weight_ih_rank = 2;
+                weight_ih_shape = (int64_t[]) {hidden_size, input_size};
+
+                weight_hh_rank = 2;
+                weight_hh_shape = (int64_t[]) {hidden_size, hidden_size};
+
+                bias_ih_rank = 1;
+                bias_ih_shape = (int64_t[]) {hidden_size};
+
+                bias_hh_rank = 1;
+                bias_hh_shape = (int64_t[]) {hidden_size};
+
+                error = initialize(&weight_ih, weight_init, weight_ih_shape, weight_ih_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                error = initialize(&weight_hh, weight_init, weight_hh_shape, weight_hh_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                error = initialize(&bias_ih, weight_init, bias_ih_shape, bias_ih_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+
+                error = initialize(&bias_hh, weight_init, bias_hh_shape, bias_hh_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+
+                error = rnn_cell_create(&rnn, activation, weight_ih, bias_ih, weight_hh, bias_hh);
+
+                error = map_set((*layer)->cells, index, rnn);
+                break;
+            case GRU:
+                gru_cell_t *gru = NULL;
+                tensor_t *weight_ir, *weight_iz, *weight_in, *weight_hr, *weight_hz, *weight_hn;
+                tensor_t *bias_ir, *bias_iz, *bias_in, *bias_hr, *bias_hz, *bias_hn;
+                int64_t *weight_ir_shape, *weight_iz_shape, *weight_in_shape, *weight_hr_shape, *weight_hz_shape, *weight_hn_shape;
+                int64_t *bias_ir_shape, *bias_iz_shape, *bias_in_shape, *bias_hr_shape, *bias_hz_shape, *bias_hn_shape;
+                int64_t weight_ir_rank, weight_iz_rank, weight_in_rank, weight_hr_rank, weight_hz_rank, weight_hn_rank;
+                int64_t bias_ir_rank, bias_iz_rank, bias_in_rank, bias_hr_rank, bias_hz_rank, bias_hn_rank;
+
+                weight_ir_rank = 2;
+                weight_iz_rank = 2;
+                weight_in_rank = 2;
+                weight_hr_rank = 2;
+                weight_hz_rank = 2;
+                weight_hn_rank = 2;
+                bias_ir_rank = 1;
+                bias_iz_rank = 1;
+                bias_in_rank = 1;
+                bias_hr_rank = 1;
+                bias_hz_rank = 1;
+                bias_hn_rank = 1;
+
+                weight_ir_shape = (int64_t[]) {hidden_size, input_size};
+                weight_iz_shape = (int64_t[]) {hidden_size, input_size};
+                weight_in_shape = (int64_t[]) {hidden_size, input_size};
+
+                weight_hr_shape = (int64_t[]) {hidden_size, hidden_size};
+                weight_hz_shape = (int64_t[]) {hidden_size, hidden_size};
+                weight_hn_shape = (int64_t[]) {hidden_size, hidden_size};
+
+                bias_ir_shape = (int64_t[]) {hidden_size};
+                bias_iz_shape = (int64_t[]) {hidden_size};
+                bias_in_shape = (int64_t[]) {hidden_size};
+                bias_hr_shape = (int64_t[]) {hidden_size};
+                bias_hz_shape = (int64_t[]) {hidden_size};
+                bias_hn_shape = (int64_t[]) {hidden_size};
+
+
+                error = initialize(&weight_ir, weight_init, weight_ir_shape, weight_ir_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                error = initialize(&weight_iz, weight_init, weight_iz_shape, weight_iz_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                error = initialize(&weight_in, weight_init, weight_in_shape, weight_in_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                error = initialize(&weight_hr, weight_init, weight_hr_shape, weight_hr_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                error = initialize(&weight_hz, weight_init, weight_hz_shape, weight_hz_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                error = initialize(&weight_hn, weight_init, weight_hn_shape, weight_hn_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                
+                error = initialize(&bias_ir, weight_init, bias_ir_shape, bias_ir_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+
+                error = initialize(&bias_iz, weight_init, bias_iz_shape, bias_iz_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+
+                error = initialize(&bias_in, bias_init, bias_in_shape, bias_in_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+
+                error = initialize(&bias_hr, bias_init, bias_hr_shape, bias_hr_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+
+                error = initialize(&bias_hz, bias_init, bias_hz_shape, bias_hz_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+
+                error = initialize(&bias_hn, bias_init, bias_hn_shape, bias_hn_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+
+                error = gru_cell_create(&gru, weight_ir, weight_iz, weight_in, weight_hr, weight_hz, weight_hn, 
+                                        bias_ir, bias_iz, bias_in, bias_hr, bias_hz, bias_hn);
+
+                error = map_set((*layer)->cells, index, gru);
+                break;
+            case LSTM:
+                lstm_cell_t *lstm = NULL;
+                tensor_t *weight_xi, *weight_hi, *bias_xi, *bias_hi;
+                tensor_t *weight_xf, *weight_hf, *bias_xf, *bias_hf;
+                tensor_t *weight_xc, *weight_hc, *bias_xc, *bias_hc;
+                tensor_t *weight_xo, *weight_ho, *bias_xo, *bias_ho;
+                tensor_t *cell_state;
+                int64_t *weight_xi_shape, *weight_hi_shape, *bias_xi_shape, *bias_hi_shape;
+                int64_t *weight_xf_shape, *weight_hf_shape, *bias_xf_shape, *bias_hf_shape;
+                int64_t *weight_xc_shape, *weight_hc_shape, *bias_xc_shape, *bias_hc_shape;
+                int64_t *weight_xo_shape, *weight_ho_shape, *bias_xo_shape, *bias_ho_shape;
+                int64_t *cell_state_shape;
+                int64_t weight_xi_rank, weight_hi_rank, bias_xi_rank, bias_hi_rank;
+                int64_t weight_xf_rank, weight_hf_rank, bias_xf_rank, bias_hf_rank;
+                int64_t weight_xc_rank, weight_hc_rank, bias_xc_rank, bias_hc_rank;
+                int64_t weight_xo_rank, weight_ho_rank, bias_xo_rank, bias_ho_rank;
+                int64_t cell_state_rank;
+
+                
+                weight_xi_rank = 2;
+                weight_hi_rank = 2;
+                bias_xi_rank = 1;
+                bias_hi_rank = 1;
+                weight_xf_rank = 2;
+                weight_hf_rank = 2;
+                bias_xf_rank = 1;
+                bias_hf_rank = 1;
+                weight_xc_rank = 2;
+                weight_hc_rank = 2;
+                bias_xc_rank = 1;
+                bias_hc_rank = 1;
+                weight_xo_rank = 2;
+                weight_ho_rank = 2;
+                bias_xo_rank = 1;
+                bias_ho_rank = 1;
+                cell_state_rank = 2;
+
+
+                weight_xi_shape[0] = (int64_t[]) {hidden_size, input_size};
+                weight_xi_shape[1] = hidden_size;
+
+                weight_hi_shape[0] = hidden_size;
+                weight_hi_shape[1] = hidden_size;
+
+                bias_xi_shape[0] = hidden_size;
+
+                bias_hi_shape[0] = hidden_size;
+
+                weight_xf_shape[0] = input_size;
+                weight_xf_shape[1] = hidden_size;
+
+                weight_hf_shape[0] = hidden_size;
+                weight_hf_shape[1] = hidden_size;
+
+                bias_xf_shape[0] = hidden_size;
+
+                bias_hf_shape[0] = hidden_size;
+
+                weight_xc_shape[0] = input_size;
+                weight_xc_shape[1] = hidden_size;
+
+                weight_hc_shape[0] = hidden_size;
+                weight_hc_shape[1] = hidden_size;
+
+                bias_xc_shape[0] = hidden_size;
+
+                bias_hc_shape[0] = hidden_size;
+
+                weight_xo_shape[0] = input_size;
+                weight_xo_shape[1] = hidden_size;
+
+                weight_ho_shape[0] = hidden_size;
+                weight_ho_shape[1] = hidden_size;
+
+                bias_xo_shape[0] = hidden_size;
+                bias_ho_shape[0] = hidden_size;
+
+                cell_state_shape = (int64_t *) malloc(2 * sizeof(int64_t));
+                cell_state_shape[0] = batch_size;
+                cell_state_shape[1] = hidden_size;
+
+                error = initialize(&weight_xi, weight_init, weight_xi_shape, weight_xi_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                error = initialize(&weight_hi, weight_init, weight_hi_shape, weight_hi_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                error = initialize(&bias_xi, weight_init, bias_xi_shape, bias_xi_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+
+                error = initialize(&bias_hi, weight_init, bias_hi_shape, bias_hi_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+
+                error = initialize(&weight_xf, weight_init, weight_xf_shape, weight_xf_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                error = initialize(&weight_hf, weight_init, weight_hf_shape, weight_hf_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                error = initialize(&bias_xf, weight_init, bias_xf_shape, bias_xf_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+
+                error = initialize(&bias_hf, weight_init, bias_hf_shape, bias_hf_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+                
+                error = initialize(&weight_xc, weight_init, weight_xc_shape, weight_xc_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                error = initialize(&weight_hc, weight_init, weight_hc_shape, weight_hc_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+                                
+                error = initialize(&bias_xc, weight_init, bias_xc_shape, bias_xc_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+
+                error = initialize(&bias_hc, weight_init, bias_hc_shape, bias_hc_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+                
+                error = initialize(&weight_xo, weight_init, weight_xo_shape, weight_xo_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                error = initialize(&weight_ho, weight_init, weight_ho_shape, weight_ho_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize weights."), error);
+                }
+
+                error = initialize(&bias_xo, weight_init, bias_xo_shape, bias_xo_rank, runtime, datatype, true);
+                if (error)
+                {
+                    return ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                }
+
+                error = initialize(&bias_ho, weight_init, bias_ho_shape, bias_ho_rank, runtime, datatype, true);
+                if (error)
+                {
+                    error = ERROR(ERROR_INITIALIZATION, string_create("failed to initialize bias."), error);
+                    goto cleanup;
+                }
+
+                error = tensor_create_zeroes(&cell_state, cell_state_shape, cell_state_rank, runtime, datatype, true, true); // TODO: Allow user to init this?
+
+                error = lstm_cell_create(&lstm, weight_xi, weight_hi, bias_xi, bias_hi, 
+                                        weight_xf, weight_hf, bias_xf, bias_hf, 
+                                        weight_xc, weight_hc, bias_xc, bias_hc,
+                                        weight_xo, weight_ho, bias_xo, bias_ho,
+                                        cell_state);
+                error = map_set((*layer)->cells, index, lstm);
+                break;
+            default:
+                // error no type
+                break;
+        }
+   }
+    return error;
+
+cleanup:
+    return error;
+}
+
+void rnn_layer_destroy(rnn_layer_t *layer)
+{
+    if(layer)
+    {
+        for (uint64_t i = 0; i < layer->cells->capacity; ++i)
+        {
+            if (layer->cells->entries[i].data)
+            {
+                switch(layer->type)
+                {
+                    case RNN:
+                        rnn_cell_destroy((rnn_cell_t *) layer->cells->entries[i].data);
+                        break;
+                    case GRU:
+                        gru_cell_destroy((gru_cell_t *) layer->cells->entries[i].data);
+                        break;
+                    case LSTM:
+                        lstm_cell_destroy((lstm_cell_t *) layer->cells->entries[i].data);
+                        break;
+                    default:
+                        break; // TODO: What to do here?
+
+                }
+            }
+        }
+        map_destroy(layer->cells);
+        free(layer);
+    }
+}
+
+nw_error_t *rnn_stack_create(rnn_stack_t **stack, recurrent_type_t type, int64_t num_layers, int64_t batch_size, int64_t input_size, int64_t hidden_size, runtime_t runtime, datatype_t datatype, bool_t bidirectional,
+                             parameter_init_t *weight_init, parameter_init_t *bias_init, activation_function_type_t activation, void *dropout)
+{
+    CHECK_NULL_ARGUMENT(stack, "stack");
+    CHECK_NULL_ARGUMENT(weight_init, "weight_init");
+    CHECK_NULL_ARGUMENT(bias_init, "bias_init");
+
+    *stack = (rnn_stack_t *) malloc(sizeof(rnn_stack_t));
+    if (!*stack)
+    {
+        return ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytees.", sizeof(rnn_stack_t)), NULL);
+    }
+
+    nw_error_t *error = NULL;
+
+    (*stack)->type = type;
+    (*stack)->hidden_size = hidden_size;
+    (*stack)->input_size = input_size;
+    (*stack)->bidirectional = bidirectional;
+
+    (*stack)->dropout = (void *) malloc(datatype_size(datatype));
+    if (!(*stack)->dropout)
+    {
+        error = ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", datatype_size(datatype)), NULL);
+        goto cleanup;
+    }
+    memcpy((*stack)->dropout, dropout, datatype_size(datatype));
+
+    map_t *map = NULL;
+    error = map_create(&map);
+    if (error)
+    {
+        error = ERROR(ERROR_CREATE, string_create("failed to create map"), NULL);
+        goto cleanup;
+    }
+    (*stack)->layers = map;
+
+    string_t index;
+    for (int64_t i = 0; i < num_layers; ++i)
+    {
+        index = string_create("%lu", i);
+        rnn_layer_t *layer = NULL;
+        switch(type)
+        {
+            case RNN:
+                error = rnn_layer_create(&layer, type, batch_size, hidden_size, input_size, runtime, datatype, bidirectional, weight_init, bias_init, activation);
+                if (error)
+                {
+                    error = ERROR(ERROR_RNN, string_create("failed to create rnn layer"), error);
+                    goto cleanup;
+                }
+
+                error = map_set((*stack)->layers, index, layer);
+                if (error)
+                {
+                    error = ERROR(ERROR_SET, string_create("failed to set entry."), error);
+                    goto cleanup;
+                }
+                break;
+            case GRU:
+                error = rnn_layer_create(&layer, type, batch_size, hidden_size, input_size, runtime, datatype, bidirectional, weight_init, bias_init, activation);
+                if (error)
+                {
+                    error = ERROR(ERROR_RNN, string_create("failed to create rnn layer"), error);
+                    goto cleanup;
+                }
+
+                error = map_set((*stack)->layers, index, layer);
+                if (error)
+                {
+                    error = ERROR(ERROR_SET, string_create("failed to set entry."), error);
+                    goto cleanup;
+                }
+                break;
+            case LSTM:
+                error = rnn_layer_create(&layer, type, batch_size, hidden_size, input_size, runtime, datatype, bidirectional, weight_init, bias_init, activation);
+                if (error)
+                {
+                    error = ERROR(ERROR_RNN, string_create("failed to create rnn layer"), error);
+                    goto cleanup;
+                }
+
+                error = map_set((*stack)->layers, index, layer);
+                if (error)
+                {
+                    error = ERROR(ERROR_SET, string_create("failed to set entry."), error);
+                    goto cleanup;
+                }
+
+                break;
+            default:
+                return ERROR(ERROR_RNN, string_create("Unknown recurrent cell type."), error);
+                goto cleanup;
+        }
+        string_destroy(index);
+        index = NULL;
+    }
+    return error;
+
+cleanup:
+    rnn_stack_destroy(*stack);
+    return error;    
+}
+
+void rnn_stack_destroy(rnn_stack_t *stack)
+{
+    if(stack)
+    {
+        for (uint64_t i = 0; i < stack->layers->capacity; ++i)
+        {
+            if (stack->layers->entries[i].data)
+            {
+                rnn_layer_destroy((rnn_layer_t *) stack->layers->entries[i].data);
+            }
+        }
+        map_destroy(stack->layers);
+        free(stack->dropout);
+        free(stack);
+    }
+}
+
 nw_error_t *model_forward(model_t *model, tensor_t *x, tensor_t **y)
 {
     PRINTLN_DEBUG_LOCATION("input");
@@ -2207,7 +2908,6 @@ nw_error_t *embedding_forward(embedding_t *embedding, tensor_t *x, tensor_t **y)
     CHECK_NULL_ARGUMENT(y, "y");
 
     nw_error_t *error = NULL;
-
     error = tensor_embedding(x, embedding->weights, embedding->vocabulary_counter, y);
     if (error)
     {
@@ -2399,6 +3099,935 @@ nw_error_t *residual_block_forward(block_t *block, tensor_t *x, tensor_t **y)
     PRINTLN_DEBUG_TENSOR("y", *y);
     PRINT_DEBUG_NEWLINE;
 
+    return error;
+}
+
+//insert forward
+nw_error_t *simple_rnn_cell_forward(void *cell, recurrent_type_t type, tensor_t *x, tensor_t *hidden, tensor_t **y)
+{
+    PRINTLN_DEBUG_LOCATION("input");
+    PRINTLN_DEBUG_TENSOR("x", x);
+    PRINT_DEBUG_NEWLINE;
+
+
+    CHECK_NULL_ARGUMENT(cell, "cell");
+    CHECK_NULL_ARGUMENT(x, "x");
+    CHECK_NULL_ARGUMENT(y, "y");
+
+    nw_error_t *error = NULL;
+    switch(type)
+    {
+        case RNN:
+            error = rnn_cell_forward((rnn_cell_t *) cell, x, hidden, y);
+            if (error)
+            {
+                return ERROR(ERROR_RNN, string_create("failed to perform forward pass on the rnn cell."), error);
+            }
+            break;
+        case GRU:
+            error = gru_cell_forward((gru_cell_t *)cell, x, hidden, y);
+            if (error)
+            {
+                return ERROR(ERROR_RNN, string_create("failed to perform forward pass on the gru cell."), error);
+            }
+            break;
+        case LSTM:
+            error = lstm_cell_forward((lstm_cell_t *)cell, x, hidden, y);
+            if (error)
+            {
+                return ERROR(ERROR_RNN, string_create("failed to perform forward pass on the lstm cell."), error);
+            }
+            break;
+        default:
+            return ERROR(ERROR_RNN, string_create("Unknown recurrent cell type."), error);
+    }
+
+    PRINTLN_DEBUG_LOCATION("output");
+    PRINTLN_DEBUG_TENSOR("y", *y);
+    PRINT_DEBUG_NEWLINE;
+
+    return error;
+}
+
+nw_error_t *rnn_cell_forward(rnn_cell_t *rnn, tensor_t *x, tensor_t *hidden, tensor_t **y)
+{
+    PRINTLN_DEBUG_LOCATION("input");
+    PRINTLN_DEBUG_TENSOR("x", x);
+    PRINT_DEBUG_NEWLINE;
+    CHECK_NULL_ARGUMENT(rnn, "rnn");
+    CHECK_NULL_ARGUMENT(x, "x");
+    CHECK_NULL_ARGUMENT(y, "y");
+
+    nw_error_t *error = NULL;
+    tensor_t *input_w = NULL;
+    tensor_t *input_w_b = NULL;
+    tensor_t *hidden_w = NULL;
+    tensor_t *hidden_w_b = NULL;
+
+    error = tensor_matrix_multiplication(x, rnn->weight_ih, &input_w);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(input_w, rnn->bias_ih, &input_w_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_matrix_multiplication(hidden, rnn->weight_hh, &hidden_w);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(hidden_w, rnn->bias_hh, &hidden_w_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    switch(rnn->activation)
+    {
+        case ACTIVATION_TANH:
+            error = tensor_tanh(hidden_w_b, y);
+            if (error)
+            {
+                error = ERROR(ERROR_TANH, string_create("failed to perform tanh operation."), error);
+                goto cleanup;
+            }
+            break;
+        case ACTIVATION_LEAKY_RECTIFIED_LINEAR:
+            error = tensor_rectified_linear(hidden_w_b, y);
+            if (error)
+            {
+                error = ERROR(ERROR_RECTIFIED_LINEAR, string_create("failed to perform relu operation."), error);
+                goto cleanup;
+            }
+            break;
+        default:
+            error = ERROR(ERROR_RNN, string_create("unknown activation function for rnn."), error);
+            goto cleanup;
+    }
+   
+    PRINTLN_DEBUG_LOCATION("output");
+    PRINTLN_DEBUG_TENSOR("y", *y);
+    PRINT_DEBUG_NEWLINE;
+    
+    return error;
+
+cleanup:
+    tensor_destroy(input_w);
+    tensor_destroy(input_w_b);
+    tensor_destroy(hidden_w);
+    tensor_destroy(hidden_w_b);
+    return error;
+}
+
+nw_error_t *gru_cell_forward(gru_cell_t *gru, tensor_t *x, tensor_t *hidden, tensor_t **y)
+{
+    PRINTLN_DEBUG_LOCATION("input");
+    PRINTLN_DEBUG_TENSOR("x", x);
+    PRINT_DEBUG_NEWLINE;
+
+    CHECK_NULL_ARGUMENT(gru, "gru");
+    CHECK_NULL_ARGUMENT(x, "x");
+    CHECK_NULL_ARGUMENT(y, "y");
+
+    nw_error_t *error = NULL;
+    tensor_t *input_r_w = NULL;
+    tensor_t *input_r_w_b = NULL;
+    tensor_t *hidden_r_w = NULL;
+    tensor_t *hidden_r_w_b = NULL;
+    tensor_t *pre_sigmoid_r = NULL;
+    tensor_t *r_gate = NULL;
+
+    tensor_t *input_z_w = NULL;
+    tensor_t *input_z_w_b = NULL;
+    tensor_t *hidden_z_w = NULL;
+    tensor_t *hidden_z_w_b = NULL;
+    tensor_t *pre_sigmoid_z = NULL;
+    tensor_t *z_gate = NULL;
+
+    tensor_t *input_n_w = NULL;
+    tensor_t *input_n_w_b = NULL;
+    tensor_t *hidden_n_w = NULL;
+    tensor_t *hidden_n_w_b = NULL;
+    tensor_t *hidden_n_reset = NULL;
+    tensor_t *pre_tanh_n = NULL;
+    tensor_t *n_gate = NULL;
+
+    tensor_t *one_constant = NULL;
+    tensor_t *one_minus_z = NULL;
+    tensor_t *final_hidden_1 = NULL;
+    tensor_t *final_hidden_2 = NULL;
+    void *scalar_1 = NULL;
+    datatype_t datatype = x->buffer->storage->datatype;
+    runtime_t runtime = x->buffer->storage->runtime;
+    size_t size = datatype_size(datatype);
+
+    // reset gate
+    error = tensor_matrix_multiplication(gru->weight_ir, x, &input_r_w);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(input_r_w, gru->bias_ir, &input_r_w_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_matrix_multiplication(gru->weight_hr, hidden, &hidden_r_w);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(hidden_r_w, gru->bias_ir, &hidden_r_w_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(input_r_w_b, hidden_r_w_b, &pre_sigmoid_r);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_sigmoid(pre_sigmoid_r, &r_gate);
+    if (error)
+    {
+        error = ERROR(ERROR_SIGMOID, string_create("failed to perform sigmoid operation."), error);
+        goto cleanup;
+    }
+
+    // update gate
+    error = tensor_matrix_multiplication(gru->weight_iz, x, &input_z_w);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(input_z_w, gru->bias_iz, &input_z_w_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_matrix_multiplication(gru->weight_hz, hidden, &hidden_z_w);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(hidden_z_w, gru->bias_iz, &hidden_z_w_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(input_z_w_b, hidden_z_w_b, &pre_sigmoid_z);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+    error = tensor_sigmoid(pre_sigmoid_z, &z_gate);
+    if (error)
+    {
+        error = ERROR(ERROR_SIGMOID, string_create("failed to perform sigmoid operation."), error);
+        goto cleanup;
+    }
+
+    // new gate
+    error = tensor_matrix_multiplication(gru->weight_in, x, &input_n_w);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+    error = tensor_addition(input_n_w, gru->bias_in, &input_n_w_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_matrix_multiplication(gru->weight_hn, hidden, &hidden_n_w);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(hidden_n_w, gru->bias_in, &hidden_n_w_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_multiplication(r_gate, hidden_n_w_b, &hidden_n_reset);
+    if (error)
+    {
+        error = ERROR(ERROR_MULTIPLICATION, string_create("failed to multiply tensors."), error);
+        goto cleanup;
+    }
+    error = tensor_addition(input_n_w_b, hidden_n_reset, &pre_tanh_n);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_tanh(pre_tanh_n, &n_gate);
+    if (error)
+    {
+        error = ERROR(ERROR_TANH, string_create("failed to perform tanh operation."), error);
+        goto cleanup;
+    }
+
+    scalar_1 = malloc(size);
+    if (!scalar_1)
+    {
+        error = ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", size), NULL);
+        goto cleanup;
+    }
+
+    switch(datatype)
+    {
+    case FLOAT32:
+        *(float32_t *) scalar_1 = (float32_t) 1;
+        break;
+    case FLOAT64:
+        *(float64_t *) scalar_1 = (float64_t) 1;
+        break;
+    default:
+        error = ERROR(ERROR_DATATYPE, string_create("unknown datatype %d.", (int)datatype), NULL);
+        break;
+    }
+
+    error = tensor_constant(scalar_1, datatype, runtime, true, true, &one_constant);
+    if (error)
+    {
+        error = ERROR(ERROR_CREATE, string_create("failed to create tensor."), error);
+        goto cleanup;
+    }
+
+    error = tensor_subtraction(one_constant, z_gate, &one_minus_z);
+    if (error)
+    {
+        error = ERROR(ERROR_SUBTRACTION, string_create("failed to subtract tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_multiplication(one_minus_z, n_gate, &final_hidden_1);
+    if (error)
+    {
+        error = ERROR(ERROR_MULTIPLICATION, string_create("failed to multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_multiplication(z_gate, hidden, &final_hidden_2);
+    if (error)
+    {
+        error = ERROR(ERROR_MULTIPLICATION, string_create("failed to multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(final_hidden_1, final_hidden_2, y);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+    
+    PRINTLN_DEBUG_LOCATION("output");
+    PRINTLN_DEBUG_TENSOR("y", *y);
+    PRINT_DEBUG_NEWLINE;
+
+    return error;
+
+cleanup:
+    free(scalar_1);
+    tensor_destroy(input_r_w);
+    tensor_destroy(input_r_w_b);
+    tensor_destroy(hidden_r_w);
+    tensor_destroy(hidden_r_w_b);
+    tensor_destroy(pre_sigmoid_r);
+    tensor_destroy(r_gate);
+
+    tensor_destroy(input_z_w);
+    tensor_destroy(input_z_w_b);
+    tensor_destroy(hidden_z_w);
+    tensor_destroy(hidden_z_w_b);
+    tensor_destroy(pre_sigmoid_z);
+    tensor_destroy(z_gate);
+
+    tensor_destroy(input_n_w);
+    tensor_destroy(input_n_w_b);
+    tensor_destroy(hidden_n_w);
+    tensor_destroy(hidden_n_w_b);
+    tensor_destroy(hidden_n_reset);
+    tensor_destroy(pre_tanh_n);
+    tensor_destroy(n_gate);
+
+    tensor_destroy(one_constant);
+    tensor_destroy(one_minus_z);
+    tensor_destroy(final_hidden_1);
+    tensor_destroy(final_hidden_2); 
+    return error;
+}
+
+nw_error_t *lstm_cell_forward(lstm_cell_t *lstm, tensor_t *x, tensor_t *hidden, tensor_t **y)
+{
+    CHECK_NULL_ARGUMENT(lstm, "lstm");
+    CHECK_NULL_ARGUMENT(x, "x");
+    CHECK_NULL_ARGUMENT(y, "y");
+
+    nw_error_t *error = NULL;
+
+    PRINTLN_DEBUG_LOCATION("output");
+    PRINTLN_DEBUG_TENSOR("y", *y);
+    PRINT_DEBUG_NEWLINE;
+    
+    tensor_t *i_gate_w_x = NULL;
+    tensor_t *i_gate_w_x_b = NULL;
+    tensor_t *i_gate_w_h = NULL;
+    tensor_t *i_gate_w_h_b = NULL;
+    tensor_t *i_gate_pre_sigmoid = NULL;
+    tensor_t *i_gate = NULL;
+
+    tensor_t *f_gate_w_x = NULL;
+    tensor_t *f_gate_w_x_b = NULL;
+    tensor_t *f_gate_w_h = NULL;
+    tensor_t *f_gate_w_h_b = NULL;
+    tensor_t *f_gate_pre_sigmoid = NULL;
+    tensor_t *f_gate = NULL;
+
+    tensor_t *o_gate_w_x = NULL;
+    tensor_t *o_gate_w_x_b = NULL;
+    tensor_t *o_gate_w_h = NULL;
+    tensor_t *o_gate_w_h_b = NULL;
+    tensor_t *o_gate_pre_sigmoid = NULL;
+    tensor_t *o_gate = NULL;
+
+    tensor_t *g_gate_w_x = NULL;
+    tensor_t *g_gate_w_x_b = NULL;
+    tensor_t *g_gate_w_h = NULL;
+    tensor_t *g_gate_w_h_b = NULL;
+    tensor_t *g_gate_pre_tanh = NULL;
+    tensor_t *g_gate = NULL;
+
+    tensor_t *f_c_mult = NULL;
+    tensor_t* i_g_mult = NULL;
+    tensor_t *c_tanh = NULL;
+
+    // input gate
+    error = tensor_matrix_multiplication(lstm->weight_xi, x, &i_gate_w_x);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(i_gate_w_x, lstm->bias_xi, &i_gate_w_x_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_matrix_multiplication(lstm->weight_hi, hidden, &i_gate_w_h);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(i_gate_w_h, lstm->bias_hi, &i_gate_w_h_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(i_gate_w_x_b, i_gate_w_h_b, &i_gate_pre_sigmoid);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_sigmoid(i_gate_pre_sigmoid, &i_gate);
+    if (error)
+    {
+        error = ERROR(ERROR_SIGMOID, string_create("failed to perform sigmoid operation."), error);
+        goto cleanup;
+    }
+
+    // forget gate
+    error = tensor_matrix_multiplication(lstm->weight_xf, x, &f_gate_w_x);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(f_gate_w_x, lstm->bias_xf, &f_gate_w_x_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_matrix_multiplication(lstm->weight_hf, hidden, &f_gate_w_h);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(f_gate_w_h, lstm->bias_hf, &f_gate_w_h_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(f_gate_w_x_b, f_gate_w_h_b, &f_gate_pre_sigmoid);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_sigmoid(f_gate_pre_sigmoid, &f_gate);
+    if (error)
+    {
+        error = ERROR(ERROR_SIGMOID, string_create("failed to perform sigmoid operation."), error);
+        goto cleanup;
+    }
+
+    // output gate
+    error = tensor_matrix_multiplication(lstm->weight_xo, x, &o_gate_w_x);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(o_gate_w_x, lstm->bias_xo, &o_gate_w_x_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_matrix_multiplication(lstm->weight_ho, hidden, &o_gate_w_h);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(o_gate_w_h, lstm->bias_ho, &o_gate_w_h_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(o_gate_w_x_b, o_gate_w_h_b, &o_gate_pre_sigmoid);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_sigmoid(o_gate_pre_sigmoid, &o_gate);
+    if (error)
+    {
+        error = ERROR(ERROR_SIGMOID, string_create("failed to perform sigmoid operation."), error);
+        goto cleanup;
+    }
+
+    // candidate cell state
+    error = tensor_matrix_multiplication(lstm->weight_xc, x, &g_gate_w_x);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(g_gate_w_x, lstm->bias_xc, &g_gate_w_x_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_matrix_multiplication(lstm->weight_hc, hidden, &g_gate_w_h);
+    if (error)
+    {
+        error = ERROR(ERROR_MATRIX_MULTIPLICATION, string_create("failed to matrix multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(g_gate_w_h, lstm->bias_hc, &g_gate_w_h_b);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_addition(g_gate_w_x_b, g_gate_w_h_b, &g_gate_pre_tanh);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_sigmoid(g_gate_pre_tanh, &g_gate);
+    if (error)
+    {
+        error = ERROR(ERROR_SIGMOID, string_create("failed to perform sigmoid operation."), error);
+        goto cleanup;
+    }
+
+    // cell state
+    error = tensor_multiplication(f_gate, lstm->cell_state, &f_c_mult);
+    if (error)
+    {
+        error = ERROR(ERROR_MULTIPLICATION, string_create("failed to multiply tensors."), error);
+        goto cleanup;
+    }
+
+    error = tensor_multiplication(i_gate, g_gate, &i_g_mult);
+    if (error)
+    {
+        error = ERROR(ERROR_MULTIPLICATION, string_create("failed to multiply tensors."), error);
+        goto cleanup;
+    }
+
+    tensor_destroy(lstm->cell_state);
+    error = tensor_addition(f_c_mult, i_g_mult, &lstm->cell_state);
+    if (error)
+    {
+        error = ERROR(ERROR_ADDITION, string_create("failed to add tensors."), error);
+        goto cleanup;
+    }
+
+    // hidden state
+    error = tensor_tanh(lstm->cell_state, &c_tanh);
+    if (error)
+    {
+        error = ERROR(ERROR_TANH, string_create("failed to perform tanh operation."), error);
+        goto cleanup;
+    }
+
+    error = tensor_multiplication(o_gate, c_tanh, y);
+    if (error)
+    {
+        error = ERROR(ERROR_MULTIPLICATION, string_create("failed to multiply tensors."), error);
+        goto cleanup;
+    }
+
+    // TODO update cell_state
+
+    return error;
+
+cleanup:
+    tensor_destroy(i_gate_w_x);
+    tensor_destroy(i_gate_w_x_b);
+    tensor_destroy(i_gate_w_h);
+    tensor_destroy(i_gate_w_h_b);
+    tensor_destroy(i_gate_pre_sigmoid);
+    tensor_destroy(i_gate);
+
+    tensor_destroy(f_gate_w_x);
+    tensor_destroy(f_gate_w_x_b);
+    tensor_destroy(f_gate_w_h);
+    tensor_destroy(f_gate_w_h_b);
+    tensor_destroy(f_gate_pre_sigmoid);
+    tensor_destroy(f_gate);
+
+    tensor_destroy(o_gate_w_x);
+    tensor_destroy(o_gate_w_x_b);
+    tensor_destroy(o_gate_w_h);
+    tensor_destroy(o_gate_w_h_b);
+    tensor_destroy(o_gate_pre_sigmoid);
+    tensor_destroy(o_gate);
+
+    tensor_destroy(g_gate_w_x);
+    tensor_destroy(g_gate_w_x_b);
+    tensor_destroy(g_gate_w_h);
+    tensor_destroy(g_gate_w_h_b);
+    tensor_destroy(g_gate_pre_tanh);
+    tensor_destroy(g_gate);
+
+    tensor_destroy(f_c_mult);
+    tensor_destroy(i_g_mult);
+    tensor_destroy(c_tanh);
+    return error;
+}
+
+nw_error_t *simple_rnn_layer_forward(rnn_layer_t *layer, tensor_t *x, tensor_t *hidden, tensor_t **y)
+{
+    PRINTLN_DEBUG_LOCATION("input");
+    PRINTLN_DEBUG_TENSOR("x", x);
+    PRINTLN_DEBUG_TENSOR("hidden", hidden);
+    PRINT_DEBUG_NEWLINE;
+
+    CHECK_NULL_ARGUMENT(layer, "layer");
+    CHECK_NULL_ARGUMENT(x, "x");
+    CHECK_NULL_ARGUMENT(y, "y");
+    CHECK_NULL_ARGUMENT(hidden, "hidden");
+
+    nw_error_t *error = NULL;
+    int64_t batch_size = x->buffer->view->shape[0];
+    int64_t features_size = x->buffer->view->shape[2];
+    int64_t rank = x->buffer->view->rank;
+    bool_t bidirectional = layer->bidirectional;
+    tensor_t *prev_output = hidden;
+    tensor_t *output = NULL;
+    string_t index = NULL; 
+    void *cell = NULL;
+    tensor_t *cell_output = NULL;
+    tensor_t *input = NULL;
+    tensor_t *tmp_output = NULL;
+    tensor_t *final_hidden = NULL;
+
+    for (int64_t i = 0; i < layer->hidden_size; ++i)
+    {
+        index = string_create("%lu", i);
+        error = map_get(layer->cells, index, &cell);
+        if (error)
+        {
+            error = ERROR(ERROR_GET, string_create("failed to get tensor."), error);
+            goto cleanup;
+        }
+
+        error = tensor_slice(x, &input, (int64_t[]){0, batch_size, i, i+1, 0, features_size}, 2*rank);
+        if (error)
+        {
+            error = ERROR(ERROR_SLICE, string_create("failed to slice tensor."), error);
+            goto cleanup;
+        }
+
+        error = simple_rnn_cell_forward(cell, layer->type, input, prev_output, &cell_output);
+        if (error)
+        {
+            error = ERROR(ERROR_RNN, string_create("failed to perform forward operation on the rnn cell"), error);
+            goto cleanup;
+        }
+
+        if (bidirectional)
+        {
+            if (i == layer->hidden_size - 1)
+            {
+                    final_hidden = cell_output;
+            } else {
+                    tensor_destroy(cell_output); 
+            }  
+        } else {
+            if (i == 0)
+            {
+                output = cell_output;
+                cell_output = NULL;
+            } else {
+                error = tensor_concatenation(output, cell_output, &tmp_output, (int64_t) 1);
+                if (error)
+                {
+                    error = ERROR(ERROR_CONCATENATION, string_create("failed to concatenate tensors."), error);
+                    goto cleanup;
+                }
+
+                tensor_destroy(output);
+                output = tmp_output;
+                tmp_output = NULL;
+            }
+            tensor_destroy(cell_output);
+            cell_output = NULL; 
+        }
+        string_destroy(index);
+        tensor_destroy(input);
+        input = NULL;
+    } 
+
+   if (bidirectional)
+   {
+        prev_output = final_hidden;
+
+        for (int64_t j = layer->hidden_size - 1; j > -1; --j)
+        {
+            index = string_create("%lu", j);
+            error = map_get(layer->cells, index, &cell);
+            if (error)
+            {
+                error = ERROR(ERROR_GET, string_create("failed to get tensor."), error);
+                goto cleanup;
+            }
+        
+            error = tensor_slice(x, &input, (int64_t[]){0, batch_size, j, j+1, 0, features_size}, 2*rank);
+            if (error)
+            {
+                error = ERROR(ERROR_SLICE, string_create("failed to slice tensor."), error);
+                goto cleanup;
+            }
+
+            error = simple_rnn_cell_forward(cell, layer->type, input, prev_output, &cell_output);
+            if (error)
+            {
+                error = ERROR(ERROR_RNN, string_create("failed to perform forward operation on the rnn cell"), error);
+                goto cleanup;
+            }
+            
+            if (j == 0)
+            {
+                output = cell_output;
+                cell_output = NULL;
+            } else {
+                error = tensor_concatenation(output, cell_output, &tmp_output, (int64_t) 1);
+                if (error)
+                {
+                    error = ERROR(ERROR_CONCATENATION, string_create("failed to concatenate tensors."), error);
+                    goto cleanup;
+                }
+
+                tensor_destroy(output);
+                output = tmp_output;
+                tmp_output = NULL;
+            }
+
+            tensor_destroy(cell_output);
+            cell_output = NULL; 
+            string_destroy(index);
+        }
+        string_destroy(index);
+        tensor_destroy(input);
+        input = NULL;
+   } 
+
+   *y = output;
+
+    PRINTLN_DEBUG_LOCATION("output");
+    PRINTLN_DEBUG_TENSOR("y", *y);
+    PRINT_DEBUG_NEWLINE;
+    return error;
+
+cleanup:
+    tensor_destroy(output);
+    tensor_destroy(cell_output);
+    tensor_destroy(input);
+    tensor_destroy(final_hidden);
+    tensor_destroy(tmp_output);
+    return error;
+}
+
+nw_error_t *simple_rnn_stack_forward(rnn_stack_t *stack, tensor_t *x, tensor_t *hidden, bool_t inference, tensor_t **y)
+{
+    PRINTLN_DEBUG_LOCATION("input");
+    PRINTLN_DEBUG_TENSOR("x", x);
+    PRINTLN_DEBUG_TENSOR("hidden", hidden);
+    PRINT_DEBUG_NEWLINE;
+
+    CHECK_NULL_ARGUMENT(stack, "stack");
+    CHECK_NULL_ARGUMENT(x, "x");
+    CHECK_NULL_ARGUMENT(y, "y");
+    CHECK_NULL_ARGUMENT(hidden, "hidden");
+
+    nw_error_t *error = NULL;
+    int64_t batch_size = x->buffer->view->shape[0];
+
+    int64_t hidden_size = stack->hidden_size;
+    int64_t num_layers = stack->num_layers;
+    int64_t rank = hidden->buffer->view->rank;
+    int64_t num_directions = stack->bidirectional?2:1;
+    string_t index;
+    tensor_t *layer_outputs = NULL;
+    rnn_layer_t *layer = NULL;
+    tensor_t *input = x;
+    tensor_t *input_hidden = hidden;
+    tensor_t *tmp_dropout_output = NULL;
+
+    if (hidden->buffer->view->rank != 3 ||
+          hidden->buffer->view->shape[0] != num_layers * num_directions ||
+          hidden->buffer->view->shape[1] != batch_size ||
+          hidden->buffer->view->shape[2] != hidden_size)
+    {
+        return ERROR(ERROR_SHAPE, string_create("Invalid hidden state shape, expected: (num_layers * num_directions, batch_size, hidden_size)"), NULL);
+    }
+
+    for (int64_t i = 0; i < num_layers; ++i)
+    {
+        index = string_create("%lu", i);
+        error = map_get(stack->layers, index, (void *) &layer);
+        if (error)
+        {
+            error = ERROR(ERROR_GET, string_create("failed to get tensor."), error);
+            goto cleanup;
+        }
+
+        error = tensor_slice(input, &input_hidden, (int64_t[]){i, i+1, 0, batch_size, 0, hidden_size}, 2*rank); 
+        if (error)
+        {
+            error = ERROR(ERROR_SLICE, string_create("failed to slice tensor."), error);
+            goto cleanup;
+        }
+
+       error = simple_rnn_layer_forward(layer, input, input_hidden, &layer_outputs);
+        if (error)
+        {
+            error = ERROR(ERROR_RNN, string_create("failed to perform forward operation on the rnn layer"), error);
+            goto cleanup;
+        }
+
+       if (i != num_layers - 1)      
+       {
+            error = tensor_dropout(layer_outputs, &tmp_dropout_output, stack->dropout, inference);
+            if (error)
+            {
+                error = ERROR(ERROR_DROPOUT, string_create("failed to apply dropout."), error);
+                goto cleanup;
+            }
+
+            layer_outputs = tmp_dropout_output;
+            tmp_dropout_output = NULL;
+       } 
+
+       string_destroy(index);
+       input = layer_outputs;
+    }
+
+    *y = layer_outputs;
+
+    PRINTLN_DEBUG_LOCATION("output");
+    PRINTLN_DEBUG_TENSOR("y", *y);
+    PRINT_DEBUG_NEWLINE;
+    return error;
+
+cleanup:
+    tensor_destroy(input_hidden);
+    tensor_destroy(layer_outputs);
+    tensor_destroy(tmp_dropout_output);
     return error;
 }
 
@@ -2899,6 +4528,8 @@ nw_error_t *causal_multihead_self_attention_save(causal_multihead_self_attention
 
     return error;
 }
+
+//insert save
 
 nw_error_t *model_load(model_t **model, string_t path)
 {
@@ -3667,3 +5298,5 @@ cleanup:
 
     return error;
 }
+
+//insert load

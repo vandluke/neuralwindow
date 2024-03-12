@@ -5,6 +5,7 @@
 #include <errors.h>
 #include <buffer.h>
 #include <activation.h>
+#include <map.h>
 
 // Forward declarations
 typedef struct tensor_t tensor_t;
@@ -61,6 +62,84 @@ typedef struct layer_normalization_t
     tensor_t *bias;
     datatype_t datatype;
 } layer_normalization_t;
+
+typedef enum recurrent_type_t
+{
+    RNN,
+    GRU,
+    LSTM
+} recurrent_type_t;
+
+typedef struct lstm_cell_t {
+    tensor_t *weight_xi;
+    tensor_t *weight_hi;
+    tensor_t *bias_xi;
+    tensor_t *bias_hi;
+
+    tensor_t *weight_xf;
+    tensor_t *weight_hf;
+    tensor_t *bias_xf;
+    tensor_t *bias_hf;
+
+    tensor_t *weight_xc;
+    tensor_t *weight_hc;
+    tensor_t *bias_xc;
+    tensor_t *bias_hc;
+
+    tensor_t *weight_xo;
+    tensor_t *weight_ho;
+    tensor_t *bias_xo;
+    tensor_t *bias_ho;
+
+    tensor_t *cell_state;
+} lstm_cell_t;
+
+typedef struct gru_cell_t {
+    tensor_t *weight_ir;  
+    tensor_t *weight_iz; 
+    tensor_t *weight_in;  
+
+    tensor_t *weight_hr;  
+    tensor_t *weight_hz;  
+    tensor_t *weight_hn; 
+
+    tensor_t *bias_ir;   
+    tensor_t *bias_iz; 
+    tensor_t *bias_in; 
+
+    tensor_t *bias_hr; 
+    tensor_t *bias_hz; 
+    tensor_t *bias_hn;
+} gru_cell_t;
+
+typedef struct rnn_cell_t
+{
+    tensor_t *weight_ih;
+    tensor_t *bias_ih;
+    tensor_t *weight_hh;
+    tensor_t *bias_hh;
+    activation_function_type_t activation; // only relu and tanh should be used?
+} rnn_cell_t;
+
+typedef struct rnn_layer_t
+{
+    int64_t hidden_size;
+    int64_t input_size;
+    map_t *cells;
+    bool_t bidirectional;
+    recurrent_type_t type;
+} rnn_layer_t;
+
+typedef struct rnn_stack_t
+{
+    void *dropout;
+    recurrent_type_t type;
+    int64_t num_layers;
+    int64_t input_size;
+    int64_t hidden_size;
+    bool_t bidirectional;
+    map_t *layers;
+} rnn_stack_t;
 
 typedef struct reshape_t
 {
@@ -234,6 +313,21 @@ nw_error_t *leaky_rectified_linear_activation_layer_create(layer_t **layer, void
 nw_error_t *tanh_activation_layer_create(layer_t **layer);
 nw_error_t *gelu_activation_layer_create(layer_t **layer);
 
+nw_error_t *rnn_cell_create(rnn_cell_t **rnn, activation_function_type_t activation, tensor_t *weight_ih, tensor_t *bias_ih, tensor_t *weight_hh, tensor_t *bias_hh);
+void rnn_cell_destroy(rnn_cell_t *cell);
+nw_error_t *gru_cell_create(gru_cell_t **gru, tensor_t *weight_ir, tensor_t *weight_iz, tensor_t *weight_in, tensor_t *weight_hr, tensor_t *weight_hz, tensor_t *weight_hn, 
+                            tensor_t *bias_ir, tensor_t *bias_iz, tensor_t *bias_in, tensor_t *bias_hr, tensor_t *bias_hz, tensor_t *bias_hn);
+void gru_cell_destroy(gru_cell_t *cell);
+nw_error_t *lstm_cell_create(lstm_cell_t **lstm, tensor_t *weight_xi, tensor_t *weight_hi, tensor_t *bias_xi, tensor_t *bias_hi, tensor_t *weight_xf, tensor_t *weight_hf, tensor_t *bias_xf, tensor_t *bias_hf, 
+                            tensor_t *weight_xc, tensor_t *weight_hc, tensor_t *bias_xc, tensor_t *bias_hc, tensor_t *weight_xo, tensor_t *weight_ho, tensor_t *bias_xo, tensor_t *bias_ho, tensor_t *cell_state);
+void lstm_cell_destroy(lstm_cell_t *cell);
+nw_error_t *rnn_layer_create(rnn_layer_t **layer, recurrent_type_t type, int64_t batch_size, int64_t hidden_size, int64_t input_size, runtime_t runtime, datatype_t datatype, bool_t bidirectional,
+                             parameter_init_t *weight_init, parameter_init_t *bias_init, activation_function_type_t activation);
+void rnn_layer_destroy(rnn_layer_t *layer);
+nw_error_t *rnn_stack_create(rnn_stack_t **stack, recurrent_type_t type, int64_t num_layers, int64_t batch_size, int64_t input_size, int64_t hidden_size, runtime_t runtime, datatype_t datatype, bool_t bidirectional,
+                             parameter_init_t *weight_init, parameter_init_t *bias_init, activation_function_type_t activation, void *dropout);
+void rnn_stack_destroy(rnn_stack_t *stack);
+
 // Model Forward
 nw_error_t *model_forward(model_t *model, tensor_t *x, tensor_t **y);
 nw_error_t *block_forward(block_t *block, tensor_t *x, tensor_t **y);
@@ -250,6 +344,11 @@ nw_error_t *reshape_forward(reshape_t *reshape, tensor_t *x, tensor_t **y);
 nw_error_t *embedding_forward(embedding_t *embedding, tensor_t *x, tensor_t **y);
 nw_error_t *transformer_embedding_forward(transformer_embedding_t *transformer_embedding, tensor_t *x, tensor_t **y);
 nw_error_t *causal_multihead_self_attention_forward(causal_multihead_self_attention_t *causal_multihead_self_attention, tensor_t *x, tensor_t **y);
+
+nw_error_t *simple_rnn_cell_forward(void *cell, recurrent_type_t type, tensor_t *x,  tensor_t *hidden, tensor_t **y);
+nw_error_t *rnn_cell_forward(rnn_cell_t *rnn, tensor_t *x, tensor_t *hidden, tensor_t **y);
+nw_error_t *gru_cell_forward(gru_cell_t *gru, tensor_t *x, tensor_t *hidden, tensor_t **y);
+nw_error_t *lstm_cell_forward(lstm_cell_t *lstm, tensor_t *x, tensor_t *hidden, tensor_t **y);
 
 // Inference set
 nw_error_t *model_inference(model_t *model, bool_t inference);

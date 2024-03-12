@@ -692,6 +692,8 @@ typedef enum nw_error_type_t
     ERROR_SAVE,
     ERROR_WRITE,
     ERROR_READ,
+    ERROR_INDEX_OUT_OF_RANGE,
+    ERROR_RNN,
 } nw_error_type_t;
 
 typedef struct nw_error_t

@@ -3398,6 +3398,181 @@ nw_error_t *tensor_transpose(const tensor_t *x, tensor_t **y, int64_t axis1, int
     return error;
 }
 
+// nw_error_t *tensor_unsqueeze(const tensor_t *x, int64_t dim, tensor_t **y)
+// {
+//     PRINTLN_DEBUG_LOCATION("input");
+//     PRINTLN_DEBUG_TENSOR("x", x);
+//     PRINTF_DEBUG("(dim: %ld)\n", dim);
+//     PRINT_DEBUG_NEWLINE;
+
+//     CHECK_NULL_ARGUMENT(x, "x");
+//     CHECK_NULL_ARGUMENT(y, "y");
+
+//     nw_error_t *error = NULL;
+//     bool_t is_contiguous;
+//     tensor_t *x_contiguous = NULL;
+//     int64_t y_dim;
+
+//     error = tensor_contiguous(x, x_contiguous);
+//     if (error)
+//     {
+//         return ERROR(ERROR_CONTIGUOUS, string_create("failed to make the tensor contiguous."), error);
+//     }
+
+//     if (dim < 0)
+//     {
+//         dim = x->buffer->view->rank + dim + 1;
+//     }
+
+//     int64_t size = x->buffer->view->rank + 1;
+//     int64_t* new_shape = (int64_t*) malloc((size) * sizeof(int64_t));
+//     if (!new_shape)
+//     {
+//         error = ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", size), NULL);
+//         goto cleanup;
+//     }
+    
+//     for (int i = 0; i < dim; ++i) {
+//         new_shape[i] = x->buffer->view->shape[i];
+//     }
+
+//     new_shape[dim] = 1;
+
+//     for (int i = dim; i < x->buffer->view->rank; ++i) {
+//         new_shape[i + 1] = x->buffer->view->shape[i];
+//     }
+
+//     error = tensor_reshape(x, y, new_shape, size)
+//     {
+//         error = ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", size), NULL);
+//         goto cleanup;
+//     }
+
+//     PRINTLN_DEBUG_LOCATION("output");
+//     PRINTLN_DEBUG_TENSOR("x", x);
+//     PRINTLN_DEBUG_TENSOR("y", *y);
+//     PRINT_DEBUG_NEWLINE;
+
+//     free(new_shape);
+//     return error;
+
+// cleanup:
+//     free(new_shape);
+//     return error;
+// }
+
+// nw_error_t *tensor_unsqueeze(const tensor_t *x, int64_t dim, tensor_t **y)
+// {
+//     PRINTLN_DEBUG_LOCATION("input");
+//     PRINTLN_DEBUG_TENSOR("x", x);
+//     PRINTF_DEBUG("(dim: %ld)\n", dim);
+//     PRINT_DEBUG_NEWLINE;
+
+//     CHECK_NULL_ARGUMENT(x, "x");
+//     CHECK_NULL_ARGUMENT(y, "y");
+
+//     PRINTLN_DEBUG_LOCATION("output");
+//     PRINTLN_DEBUG_TENSOR("x", x);
+//     PRINTLN_DEBUG_TENSOR("y", *y);
+//     PRINT_DEBUG_NEWLINE;
+
+//     nw_error_t *error = NULL;
+    
+//     int64_t rank = x->buffer->view->rank;
+//     int64_t *shape = x->buffer->view->shape;
+
+//     if (dim == NULL)
+//     {
+//         int64_t nonone_dim = 0;
+//         for(int i = 0; i < rank; ++i)
+//         {
+//             if (shape[i] != 1)
+//             {
+//                 nonone_dim++;
+//             }
+//         }
+
+//         int64_t* new_shape = (int64_t*) malloc((nonone_dim) * sizeof(int64_t));
+//         if (!new_shape)
+//         {
+//             error = ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", (nonone_dim) * sizeof(int64_t)), NULL);
+//             goto cleanup;
+//         }
+
+//         for(int i = 0; i < rank; ++i)
+//         {
+//             if (shape[i] != 1)
+//             {
+//                 new_shape[i] = shape[i];
+//             }
+//         }
+
+//         error = tensor_reshape(x, y, new_shape, nonone_dim)
+//         {
+//             free(new_shape);
+//             error = ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", size), NULL);
+//             return error;
+//         }
+
+//         free(new_shape);
+//         return error;
+//     }
+
+//     if (!rank && (dim == 0 || dim == 1))
+//     {
+//         error = tensor_from_data(y, x->buffer->storage->data, x->buffer->storage->runtime, x->buffer->storage->datatype,
+//                                 rank, shape,  true, x->requires_gradient, x->persist);
+//         return error;
+//     }
+
+//     if (not (-1 * rank <= dim || dim <= rank - 1))
+//     {
+//         error = ERROR(ERROR_INDEX_OUT_OF_RANGE, string_create("failed, index out of range."), NULL);   
+//         return error;
+//     }
+
+//     if (dim < 0)
+//     {
+//         dim += rank;
+//     }
+
+//     if (shape[dim] != 1)
+//     {
+//         error = tensor_from_data(y, x->buffer->storage->data, x->buffer->storage->runtime, x->buffer->storage->datatype,
+//                                 rank, shape,  true, x->requires_gradient, x->persist);
+//         return error;
+
+//     }else{
+
+//         int64_t new_rank = rank - 1;
+
+//         int64_t* new_shape = (int64_t*) malloc((new_rank) * sizeof(int64_t));
+//         if (!new_shape)
+//         {
+//             error = ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", (new_rank) * sizeof(int64_t)), NULL);
+//             goto cleanup;
+//         }
+
+//         for(int i = 0; i < new_rank; ++i)
+//         {
+//             if (i != dim)
+//             {
+//                 new_shape[i] = shape[i];
+//             }
+//         }
+
+//         error = tensor_reshape(x, y, new_shape, new_rank)
+//         {
+//             free(new_shape);
+//             error = ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", size), NULL);
+//             return error;
+//         }
+
+//         free(new_shape);
+//         return error;
+//     }
+// }
+
 nw_error_t *tensor_contiguous(const tensor_t *x, tensor_t **y)
 {
     PRINTLN_DEBUG_LOCATION("input");

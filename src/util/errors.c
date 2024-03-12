@@ -235,6 +235,10 @@ string_t error_type_string(nw_error_type_t error_type)
         return "ERROR_SAVE";
     case ERROR_READ: 
         return "ERROR_READ";
+    case ERROR_INDEX_OUT_OF_RANGE:
+        return "ERROR_INDEX_OUT_OF_RANGE";
+    case ERROR_RNN:
+        return "ERROR_RNN";
     default:
         return "ERROR";
     }
