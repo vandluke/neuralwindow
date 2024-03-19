@@ -3441,10 +3441,9 @@ nw_error_t *tensor_unsqueeze(const tensor_t *x, int64_t dim, tensor_t **y)
         new_shape[i + 1] = x->buffer->view->shape[i];
     }
 
-    error = tensor_reshape(x, y, new_shape, size)
+    error = tensor_reshape(x, y, new_shape, size);
     {
         return ERROR(ERROR_RESHAPE, string_create("failed to reshape tensor."), error);
-
     }
 
     PRINTLN_DEBUG_LOCATION("output");
@@ -3509,8 +3508,7 @@ nw_error_t *tensor_squeeze(const tensor_t *x, int64_t dim, tensor_t **y)
         error = tensor_reshape(x, y, new_shape, nonone_dim);
         {
             free(new_shape);
-            error = ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", size), NULL);
-            return error;
+            return ERROR(ERROR_RESHAPE, string_create("failed to reshape tensor."), error);
         }
 
         free(new_shape);
@@ -3526,8 +3524,7 @@ nw_error_t *tensor_squeeze(const tensor_t *x, int64_t dim, tensor_t **y)
 
     if (not (-1 * rank <= dim || dim <= rank - 1))
     {
-        error = ERROR(ERROR_INDEX_OUT_OF_RANGE, string_create("failed, index out of range."), NULL);   
-        return error;
+        return ERROR(ERROR_INDEX_OUT_OF_RANGE, string_create("failed, index out of range."), NULL);   
     }
 
     if (dim < 0)
@@ -3548,8 +3545,7 @@ nw_error_t *tensor_squeeze(const tensor_t *x, int64_t dim, tensor_t **y)
         int64_t* new_shape = (int64_t*) malloc((new_rank) * sizeof(int64_t));
         if (!new_shape)
         {
-            error = ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", (new_rank) * sizeof(int64_t)), NULL);
-            goto cleanup;
+            return ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", (new_rank) * sizeof(int64_t)), NULL);
         }
 
         for(int i = 0; i < new_rank; ++i)
@@ -3563,8 +3559,7 @@ nw_error_t *tensor_squeeze(const tensor_t *x, int64_t dim, tensor_t **y)
         error = tensor_reshape(x, y, new_shape, new_rank);
         {
             free(new_shape);
-            error = ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes.", size), NULL);
-            return error;
+            return ERROR(ERROR_RESHAPE, string_create("failed to reshape tensor."), error);
         }
 
         free(new_shape);
