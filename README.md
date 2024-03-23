@@ -49,15 +49,13 @@ sudo apt-get install -y libopenblas-dev
 ```
 
 Install MAGMA
-
 ```bash
 sudo wget https://icl.utk.edu/projectsfiles/magma/downloads/magma-2.7.2.tar.gz
 tar -xvzf magma-2.7.2.tar.gz
 cd magma-2.7.2
 mkdir build && cd build
 cmake -DUSE_FORTRAN=off ..
-make
-sudo make install
+make && make install
 ```
 
 Install Check
@@ -183,7 +181,6 @@ Generate graph by defining the enviroment variable `GRAPH=1`.
 ```bash
 GRAPH=1 ./executable
 dot -Tpng graph.dot > graph.png
-dot -Tsvg graph.dot > graph.svg
 ```
 
 ## Test
