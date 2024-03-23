@@ -9,8 +9,8 @@
 #include <errors.h>
 #include <datatype.h>
 
-nw_error_t *cu_memory_allocate(void **pp, size_t size);
-void cu_memory_free(void *p);
+nw_error_t *cu_memory_allocate(void **pp, void **ppd, size_t size);
+void cu_memory_free(void *p, void *pd);
 nw_error_t *cu_create_context(void);
 void cu_destroy_context(void);
 void cu_dev_to_cpu(void *data, void *ddata, size_t size);

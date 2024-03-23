@@ -85,8 +85,8 @@ nw_error_t *storage_dev_to_cpu(storage_t *storage)
 {
     CHECK_NULL_ARGUMENT(storage, "storage");
 
-    runtime_dev_to_cpu(storage->data,
-                       storage->ddata,
+    runtime_dev_to_cpu(&storage->data,
+                       &storage->ddata,
                        storage->n,
                        storage->datatype,
                        storage->runtime);
@@ -98,8 +98,8 @@ nw_error_t *storage_cpu_to_dev(storage_t *storage)
 {
     CHECK_NULL_ARGUMENT(storage, "storage");
 
-    runtime_cpu_to_dev(storage->data,
-                       storage->ddata,
+    runtime_cpu_to_dev(&storage->data,
+                       &storage->ddata,
                        storage->n,
                        storage->datatype,
                        storage->runtime);

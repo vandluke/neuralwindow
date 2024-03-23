@@ -83,11 +83,17 @@ extern "C" void cu_destroy_context(void)
     magma_finalize();
 }
 
-extern "C" nw_error_t *cu_memory_allocate(void **pp, size_t size)
+extern "C" nw_error_t *cu_memory_allocate(void **pp, void **ppd, size_t size)
 {
     CHECK_NULL_ARGUMENT(pp, "pp");
 
-    cudaError_t error = cudaMalloc(pp, size);
+    cudaError_t error = cudaMallocHost(pp, size);
+    if (error != cudaSuccess)
+    {
+        return ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes %s.", size, cudaGetErrorString(error)), NULL);
+    }
+
+    cudaError_t error = cudaMalloc(ppd, size);
     if (error != cudaSuccess)
     {
         return ERROR(ERROR_MEMORY_ALLOCATION, string_create("failed to allocate %zu bytes %s.", size, cudaGetErrorString(error)), NULL);
@@ -96,9 +102,10 @@ extern "C" nw_error_t *cu_memory_allocate(void **pp, size_t size)
     return NULL;
 }
 
-extern "C" void cu_memory_free(void *p)
+extern "C" void cu_memory_free(void *p, void *pd)
 {
-    cudaFree(p);
+    cudaFreeHost(p);
+    cudaFree(pd);
 }
 
 extern "C" void cu_dev_to_cpu(void *data, void *ddata, size_t size)
